@@ -1,0 +1,55 @@
+/*
+ * Design tokens — source unique de la direction artistique.
+ * Modifier une valeur ici change tout le site. Ne jamais coder une couleur en dur dans un composant.
+ * Les paires texte/fond doivent respecter WCAG AA (ratio >= 4.5:1), voir tests/unit/tokens.test.ts.
+ *
+ * Direction voulue : fond blanc, écriture bleu foncé, rouge réservé à quelques éléments vivants
+ * (CTA, icônes). Le thème clair est la seule apparence servie par défaut : pas de bascule automatique
+ * selon le thème système, pour ne jamais surprendre avec un rendu sombre non voulu.
+ * Bleu et rouge rendus plus vifs (sarcelle saturé / rouge franc), inspirés d'une maquette de
+ * référence fournie par le client, tout en restant sur fond blanc et en respectant les contrastes.
+ */
+
+:root {
+  /* Couleurs sémantiques (thème clair, seul thème actif par défaut) */
+  --color-primary: #0e7490;
+  --color-primary-contrast: #ffffff;
+  --color-primary-soft: #e0f4f8;
+  --color-accent: #c8302e;
+  --color-accent-contrast: #ffffff;
+  --color-accent-soft: #fce4e3;
+  --color-danger: #b3261e;
+  --color-surface: #ffffff;
+  --color-surface-muted: #eff4f9;
+  --color-text: #0b2a4a;
+  --color-text-muted: #4f6b85;
+  --color-border: #dce6ef;
+
+  /* Typographie */
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Formes */
+  --radius-md: 0.5rem;
+  --radius-lg: 0.875rem;
+}
+
+/*
+ * Thème sombre défini mais non activé automatiquement (pas de @media prefers-color-scheme) :
+ * il ne s'applique que si quelque chose pose explicitement data-theme="dark" sur <html>
+ * (un futur bouton de bascule, par exemple). Tant qu'aucun bouton n'existe, il reste inerte.
+ */
+:root[data-theme="dark"] {
+  --color-primary: #6ea8dc;
+  --color-primary-contrast: #081524;
+  --color-primary-soft: #16283b;
+  --color-accent: #f2545b;
+  --color-accent-contrast: #2a0a08;
+  --color-accent-soft: #3a1512;
+  --color-danger: #ff8a80;
+  --color-surface: #171310;
+  --color-surface-muted: #241d17;
+  --color-text: #f3ece3;
+  --color-text-muted: #b6a99b;
+  --color-border: #4a3d32;
+}
