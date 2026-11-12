@@ -1,5 +1,7 @@
 import { siteConfig } from "@/config/site";
 
+import { escapeHtml } from "./escape-html";
+
 export type ContactConfirmationInput = {
   recipientEmail: string;
   recipientName: string;
@@ -11,15 +13,6 @@ export type RenderedEmail = {
   html: string;
   text: string;
 };
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 // Rendu serveur avec version texte (CLAUDE.md, section 9). Entrées utilisateur échappées avant
 // insertion dans le HTML (même règle que dangerouslySetInnerHTML, section 8.2).

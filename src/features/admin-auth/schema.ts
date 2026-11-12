@@ -45,3 +45,22 @@ export const changePasswordSchema = z
   });
 
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+// Code reçu par e-mail ("XXXX-XXXX") : normalisé plus tard par normalizeEmailCode.
+export const emailCodeSchema = z.string().trim().min(1, "Code requis").max(32, "Code invalide");
+
+export const passwordResetRequestSchema = z.object({
+  email: loginSchema.shape.email,
+});
+
+export const passwordResetConfirmSchema = z
+  .object({
+    email: loginSchema.shape.email,
+    code: emailCodeSchema,
+    newPassword: changePasswordSchema.shape.newPassword,
+    confirmPassword: z.string().min(1, "Confirmation requise").max(512),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Les deux mots de passe ne correspondent pas.",
+    path: ["confirmPassword"],
+  });

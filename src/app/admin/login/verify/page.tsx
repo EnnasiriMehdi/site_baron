@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { LOGIN_PATH, MfaForm, readPendingMfaChallenge } from "@/features/admin-auth";
+import { LOGIN_PATH, MfaEmailRecoveryRequest, MfaForm, readPendingMfaChallenge } from "@/features/admin-auth";
 
 export const metadata: Metadata = {
   title: "Code de vérification",
@@ -21,6 +21,7 @@ export default async function MfaVerifyPage() {
           Mot de passe confirmé. Saisissez le code de votre application d&apos;authentification.
         </p>
         <MfaForm />
+        <MfaEmailRecoveryRequest />
       </div>
     </main>
   );

@@ -458,6 +458,14 @@ Implémenté dans `features/contact/` (formulaire public, écriture) et `feature
 - Messages d'erreur de connexion génériques (« Identifiants invalides »), sans indiquer quel champ est faux.
 - Pages admin : `noindex`, non listées dans le sitemap.
 - **Double authentification (2FA)** : TOTP (RFC 6238, compatible Google Authenticator/Authy/1Password), gratuite, sans service tiers. Secret stocké en base (`users.totp_secret`), activé seulement après confirmation d'un code (`totp_enabled_at`). 8 codes de secours à usage unique (`recovery_codes`, hashés comme un mot de passe) permettent de récupérer l'accès en cas de perte du téléphone. Le jeton intermédiaire entre mot de passe et code 2FA (`features/admin-auth/mfa-session.ts`) utilise un issuer/audience JWT distincts de la session complète, pour qu'il ne puisse jamais être confondu avec une session valide. Chaque action d'inscription ou de désactivation revérifie la session (section 8.1).
+- **2FA obligatoire et récupération par e-mail** : `requireAdmin()` exige la 2FA active (sinon redirection
+  vers `/admin/security`) ; `requireAdminSession()` (session seule) est réservée au layout protégé, à la
+  page sécurité et aux actions d'enrôlement. Une 2FA active ne peut jamais être remplacée sans code
+  (`startTotpEnrollmentAction` refuse, `setPendingTotpSecret` ignore si `totp_enabled_at` est renseigné).
+  Récupération : codes à usage unique `XXXX-XXXX` envoyés à `users.email` (table `email_codes`, hachés,
+  15 min, 5 essais, 1 envoi/min) pour (a) mot de passe oublié, (b) téléphone perdu — ce second cas
+  réinitialise la 2FA et force le réenrôlement. Réponses génériques (pas d'énumération de comptes),
+  envoi après réponse (`after()`), e-mail d'alerte après chaque réinitialisation. Voir `architecture_details.md`.
 - **Changement de mot de passe** (`/admin/security`, `features/admin-auth/password-actions.ts`,
   `ChangePassword.tsx`) : exige le mot de passe actuel (revérifié via `verifyPassword`) en plus du
   nouveau, jamais la seule session — une session volée ne suffit pas à changer le mot de passe sans

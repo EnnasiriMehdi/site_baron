@@ -2,7 +2,7 @@
 
 import QRCode from "qrcode";
 
-import { requireAdmin } from "./guards";
+import { requireAdminSession } from "./guards";
 import { verifySecondFactor } from "./mfa-verification";
 import { hashPassword } from "./password";
 import { drizzleRecoveryCodeRepository } from "./recovery-code-repository";
@@ -22,7 +22,14 @@ const INVALID_CODE_MESSAGE = "Code invalide. Réessayez en relisant le code affi
  * mais une Server Action peut être appelée indépendamment du rendu de la page.
  */
 export async function startTotpEnrollmentAction(): Promise<EnrollmentStartState> {
-  const admin = await requireAdmin();
+  // Session seule : ces actions servent justement à activer la 2FA (voir requireAdminSession).
+  const admin = await requireAdminSession();
+
+  // Sans ce refus, une session volée pouvait remplacer le secret d'une 2FA active et la neutraliser.
+  // Pour changer de téléphone : désactiver d'abord avec un code (disableTotpAction).
+  if (admin.totpEnabled) {
+    return { error: "La double authentification est déjà active. Utilisez « Changer de téléphone »." };
+  }
 
   const secret = generateTotpSecret();
   await drizzleAdminUserRepository.setPendingTotpSecret(admin.userId, secret);
@@ -37,13 +44,13 @@ export async function confirmTotpEnrollmentAction(
   _previous: EnrollmentConfirmState,
   formData: FormData,
 ): Promise<EnrollmentConfirmState> {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSession();
 
   const parsed = secondFactorCodeSchema.safeParse(formData.get("code"));
   if (!parsed.success) return { error: INVALID_CODE_MESSAGE };
 
   const user = await drizzleAdminUserRepository.findById(admin.userId);
-  if (!user?.totpSecret) {
+  if (!user?.totpSecret || user.totpEnabledAt) {
     return { error: "Aucune inscription en cours. Recommencez depuis le début." };
   }
 
@@ -64,7 +71,7 @@ export async function disableTotpAction(
   _previous: DisableMfaState,
   formData: FormData,
 ): Promise<DisableMfaState> {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSession();
 
   const parsed = secondFactorCodeSchema.safeParse(formData.get("code"));
   if (!parsed.success) return { error: INVALID_CODE_MESSAGE };

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import { users, type User } from "@/lib/db/schema";
@@ -43,8 +43,13 @@ export const drizzleAdminUserRepository: AdminUserRepository = {
 
   // Le secret est stocké dès le début de l'inscription, mais totpEnabledAt reste vide
   // jusqu'à la confirmation (enableTotp) : un secret non confirmé n'active jamais le 2FA.
+  // La condition isNull(totpEnabledAt) est une défense en profondeur : même si une action oubliait
+  // de vérifier, un secret ne peut jamais écraser celui d'une 2FA déjà active.
   async setPendingTotpSecret(id, secret) {
-    await getDb().update(users).set({ totpSecret: secret, totpEnabledAt: null }).where(eq(users.id, id));
+    await getDb()
+      .update(users)
+      .set({ totpSecret: secret })
+      .where(and(eq(users.id, id), isNull(users.totpEnabledAt)));
   },
 
   async enableTotp(id) {
