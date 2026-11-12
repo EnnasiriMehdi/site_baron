@@ -90,7 +90,7 @@ export async function updateArticleAction(_previous: ArticleFormState, formData:
     if (typeof photoAlt !== "string" || photoAlt.trim().length === 0) {
       return { error: "Texte alternatif requis pour la photo de couverture." };
     }
-    const imageCheck = validatePublicImage(photo);
+    const imageCheck = await validatePublicImage(photo);
     if (!imageCheck.ok) return { error: imageCheck.error };
 
     const path = await storePublicImage(imageCheck.file, "articles");
@@ -133,7 +133,7 @@ export async function uploadArticleImageAction(
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   await requireAdmin();
 
-  const imageCheck = validatePublicImage(file);
+  const imageCheck = await validatePublicImage(file);
   if (!imageCheck.ok) return { ok: false, error: imageCheck.error };
 
   const url = await storePublicImage(imageCheck.file, "articles");

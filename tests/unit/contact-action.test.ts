@@ -45,13 +45,25 @@ describe("submitContactAction", () => {
     );
   });
 
-  it("transmet les pièces jointes valides", async () => {
-    const file = new File(["contenu"], "panne.jpg", { type: "image/jpeg" });
+  it("transmet les pièces jointes valides (vraie image)", async () => {
+    // En-tête JPEG réel : la validation lit les octets, pas le type annoncé.
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
     const form = validForm();
-    form.append("attachments", file);
+    form.append("attachments", new File([jpeg], "panne.jpg", { type: "image/jpeg" }));
 
     expect(await submitContactAction(null, form)).toEqual({ ok: true });
     expect(mocks.submit.mock.calls[0]?.[1]).toHaveLength(1);
+  });
+
+  it("refuse un fichier déguisé en image (type annoncé falsifié)", async () => {
+    const form = validForm();
+    form.append("attachments", new File(["MZ-executable"], "virus.exe", { type: "image/png" }));
+
+    const result = await submitContactAction(null, form);
+
+    expect(result?.ok).toBe(false);
+    if (result && !result.ok) expect(result.error).toContain("Format non accepté");
+    expect(mocks.submit).not.toHaveBeenCalled();
   });
 
   it("renvoie un faux succès au robot qui remplit le piège, sans rien enregistrer", async () => {

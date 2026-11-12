@@ -47,7 +47,7 @@ export async function submitContactAction(_previous: ContactFormState, formData:
   }
 
   const files = formData.getAll("attachments").filter(isFile);
-  const attachmentCheck = validateAttachments(files);
+  const attachmentCheck = await validateAttachments(files);
   if (!attachmentCheck.ok) {
     return { ok: false, error: attachmentCheck.error };
   }

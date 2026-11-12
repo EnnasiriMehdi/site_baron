@@ -12,6 +12,12 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  experimental: {
+    // Défaut de Next : 1 Mo, trop peu pour des pièces jointes (jusqu'à 20 Mo au formulaire de contact)
+    // ou une réalisation admin (5 photos de 5 Mo au maximum). Nginx doit autoriser au moins autant
+    // (client_max_body_size, voir architecture_details.md, section Déploiement), sinon il refuse avant Next.
+    serverActions: { bodySizeLimit: "30mb" },
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
