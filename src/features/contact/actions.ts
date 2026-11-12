@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 
+import { siteConfig } from "@/config/site";
 import { clientIp } from "@/lib/client-ip";
 import { RateLimiter } from "@/lib/rate-limit";
 import { validateAttachments } from "@/lib/uploads";
@@ -51,7 +52,20 @@ export async function submitContactAction(_previous: ContactFormState, formData:
     return { ok: false, error: attachmentCheck.error };
   }
 
-  await contactService.submit(parsed.data, attachmentCheck.files);
+  try {
+    await contactService.submit(parsed.data, attachmentCheck.files);
+  } catch (error) {
+    // Sans ceci, une panne (base verrouillée, disque plein) affiche la page d'erreur par défaut de Next
+    // et le visiteur ne sait pas si sa demande est partie. Nom de l'erreur seulement : aucune donnée
+    // personnelle dans les logs (CLAUDE.md, section 8.4).
+    console.error(
+      `Échec de l'enregistrement d'une demande de contact (${error instanceof Error ? error.name : "erreur inconnue"}).`,
+    );
+    return {
+      ok: false,
+      error: `Votre demande n'a pas pu être enregistrée. Appelez-nous directement au ${siteConfig.phone.display}.`,
+    };
+  }
 
   return { ok: true };
 }

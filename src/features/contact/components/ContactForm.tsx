@@ -5,6 +5,7 @@ import { useActionState, useState, type ChangeEvent } from "react";
 import { ALLOWED_MIME_TYPES, MAX_FILES, MAX_FILE_BYTES } from "@/lib/upload-limits";
 
 import { submitContactAction, type ContactFormState } from "../actions";
+import { ContactSuccess } from "./ContactSuccess";
 
 const initialState: ContactFormState = null;
 const MAX_FILE_MB = MAX_FILE_BYTES / 1024 / 1024;
@@ -44,15 +45,7 @@ export function ContactForm() {
   }
 
   if (state?.ok) {
-    return (
-      <div role="status" className="rounded-(--radius-lg) border border-(--color-border) bg-(--color-surface) p-6">
-        <p className="font-semibold text-(--color-primary)">Votre demande a bien été envoyée.</p>
-        <p className="mt-2 text-sm text-(--color-text-muted)">
-          Nous revenons vers vous par téléphone ou par e-mail. Pour une urgence, appeler reste le moyen le
-          plus rapide d&apos;être pris en charge.
-        </p>
-      </div>
-    );
+    return <ContactSuccess />;
   }
 
   return (

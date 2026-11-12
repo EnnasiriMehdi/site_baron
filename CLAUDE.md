@@ -542,10 +542,17 @@ Implémenté dans `features/contact/` (formulaire public, écriture) et `feature
 - Relances planifiées : job déclenché par le cron, traite un lot borné, vérifie le secret, retourne un résumé (nombre envoyé / échoué).
 - En développement, les emails vont vers un outil de capture (Mailpit ou équivalent), jamais vers de vraies adresses.
 
-### 9.1 Implémenté : confirmation après formulaire de contact
+### 9.1 Infrastructure e-mail (la confirmation au visiteur a été retirée)
+> **Aucun e-mail n'est envoyé au visiteur du formulaire de contact** : une confirmation vers une adresse
+> non vérifiée servait de relais d'e-mails (nom et objet choisis par un tiers, expédiés depuis l'adresse de
+> l'entreprise). Règle : **ne jamais envoyer de message dont le destinataire OU un texte libre est fourni par
+> un visiteur anonyme.** La notification à l'admin (adresse fixe) sera ajoutée dans
+> `features/contact/service.ts` (point d'assemblage : `contact-instance.ts`). `sendContactConfirmation` et son gabarit subsistent, inutilisés
+> (à nettoyer, voir `report.md` §7). Les e-mails actuellement envoyés sont ceux de la récupération du
+> compte admin (codes et alertes, adresse = celle du compte).
 - **Mailer** (`lib/mailer/`) : interface `Mailer` (`send`) ; `smtp-mailer.ts` parle au serveur SMTP de Google (Gmail) via Nodemailer avec retry borné (3 tentatives, backoff) ; `console-mailer.ts` remplace l'envoi réel hors production (journalise le sujet seulement, jamais le destinataire). `lib/mailer/index.ts` (`getMailer()`) choisit l'implémentation selon `NODE_ENV` — c'est la **seule** composition à utiliser, jamais `nodemailer` importé ailleurs.
-- **Notifications** (`features/notifications/`) : `sendContactConfirmation` construit l'e-mail (`templates/contact-confirmation.ts`, HTML + texte, entrées utilisateur échappées) et l'envoie via `Mailer`.
-- **Déclenchement** (`features/contact/service.ts`) : après l'enregistrement du lead (jamais avant), `notify(input)` est appelé. Un échec est rattrapé et journalisé (nom de l'erreur seulement, jamais l'adresse du visiteur) — il ne fait **jamais** échouer la soumission déjà enregistrée en base.
+- **Notifications** (`features/notifications/`) : `createNotificationService(mailer)` construit chaque e-mail (`templates/`, HTML + texte, valeurs échappées) et l'envoie via `Mailer`. `sendContactConfirmation` n'est plus appelé.
+- **Déclenchement** : aucun pour le moment dans `features/contact/service.ts`. Règle pour la notification admin à venir : elle s'exécute **après** l'enregistrement du lead (jamais avant), et un échec est rattrapé et journalisé (nom de l'erreur seulement, jamais d'adresse) — il ne doit **jamais** faire échouer la soumission déjà enregistrée en base.
 - **Variables d'environnement** (`lib/env.ts`, `.env.example`) : `SMTP_HOST` (défaut `smtp.gmail.com`), `SMTP_PORT` (défaut `465`), `SMTP_USER`, `SMTP_PASSWORD` — ces deux derniers **optionnels** dans le schéma Zod (pour ne jamais casser le démarrage en développement) mais **exigés** par `getMailer()` dès que `NODE_ENV=production`. `SMTP_PASSWORD` doit être un mot de passe d'application Gmail (2FA du compte Google requis), jamais le mot de passe du compte.
 
 ---
