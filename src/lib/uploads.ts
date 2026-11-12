@@ -65,7 +65,7 @@ export async function storeAttachments(files: File[]): Promise<AttachmentToStore
     const mimeType = detectImageType(buffer);
     if (!mimeType) throw new Error("Type de fichier non reconnu.");
 
-    const filename = `${randomUUID()}.${EXTENSION_BY_IMAGE_TYPE[mimeType]}`;
+    const filename = `${Date.now()}-${randomUUID()}.${EXTENSION_BY_IMAGE_TYPE[mimeType]}`;
     await writeFile(path.join(UPLOADS_DIR, filename), buffer);
 
     stored.push({

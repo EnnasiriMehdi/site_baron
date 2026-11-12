@@ -68,7 +68,7 @@ describe("storeAttachments", () => {
     const [stored] = await storeAttachments([disguised]);
 
     expect(stored?.mimeType).toBe("image/png");
-    expect(stored?.storedPath).toMatch(/^[0-9a-f-]{36}\.png$/);
+    expect(stored?.storedPath).toMatch(/^\d+-[0-9a-f-]{36}\.png$/);
     // Le nom d'origine n'est conservé que pour l'affichage, jamais comme chemin.
     expect(stored?.originalName).toBe("virus.exe");
     expect(fsMocks.writeFile).toHaveBeenCalledTimes(1);
@@ -86,10 +86,20 @@ describe("validatePublicImage / storePublicImage", () => {
     expect((await validatePublicImage(file(text("MZ"), "a.jpg", "image/jpeg"))).ok).toBe(false);
   });
 
-  it("stocke sous une extension déduite du contenu", async () => {
-    const url = await storePublicImage(file(JPEG, "photo.png", "image/png"), "realisations");
+  it("garde le nom réel, avec l'extension déduite du contenu", async () => {
+    const url = await storePublicImage(file(JPEG, "Chaudière murale.png", "image/png"), "realisations");
 
-    expect(url).toMatch(/^\/uploads\/realisations\/\d+-[0-9a-f-]{36}\.jpg$/);
+    expect(url).toBe("/uploads/realisations/Chaudiere_murale.jpg");
+  });
+
+  it("n'écrase jamais une photo de même nom", async () => {
+    fsMocks.writeFile
+      .mockRejectedValueOnce(Object.assign(new Error("exists"), { code: "EEXIST" }))
+      .mockResolvedValueOnce(undefined);
+
+    const url = await storePublicImage(file(JPEG, "photo.jpg", "image/jpeg"), "realisations");
+
+    expect(url).toBe("/uploads/realisations/photo-2.jpg");
   });
 
   it("refuse d'écrire un contenu qui n'est pas une image", async () => {

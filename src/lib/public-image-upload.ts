@@ -1,10 +1,9 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { detectImageType, EXTENSION_BY_IMAGE_TYPE, readImageType } from "./image-type";
+import { detectImageType, readImageType, safeDownloadName } from "./image-type";
 import { MAX_IMAGE_BYTES } from "./upload-limits";
 
 /*
@@ -13,7 +12,7 @@ import { MAX_IMAGE_BYTES } from "./upload-limits";
  * sont destinées à être vues par tout visiteur et doivent passer par next/image : elles vivent
  * donc sous public/uploads/, en chemin statique, sans configuration images.* supplémentaire.
  * Gérées par l'admin uniquement (jamais un visiteur), mais la même discipline s'applique quand
- * même : type déduit des octets (jamais de `file.type`), nom de fichier généré.
+ * même : type déduit des octets (jamais de `file.type`), nom nettoyé, extension imposée.
  */
 const PUBLIC_UPLOADS_ROOT = path.resolve(process.cwd(), "public", "uploads");
 
@@ -38,9 +37,26 @@ export async function storePublicImage(file: File, subdir: string): Promise<stri
   const dir = path.join(PUBLIC_UPLOADS_ROOT, subdir);
   await mkdir(dir, { recursive: true });
 
-  const filename = `${Date.now()}-${randomUUID()}.${EXTENSION_BY_IMAGE_TYPE[mimeType]}`;
-  await writeFile(path.join(dir, filename), buffer);
+  // Nom réel conservé (utile au SEO), mais nettoyé et avec l'extension du type vérifié :
+  // jamais de caractère dangereux ni d'extension choisie dans le nom d'origine.
+  const filename = await writeWithoutOverwriting(dir, safeDownloadName(file.name, mimeType), buffer);
 
   // Chemin public utilisable directement comme src de next/image.
   return `/uploads/${subdir}/${filename}`;
+}
+
+// Flag "wx" : échoue si le fichier existe déjà. Deux photos au même nom ne s'écrasent jamais :
+// la seconde devient « nom-2.jpg », « nom-3.jpg »...
+async function writeWithoutOverwriting(dir: string, filename: string, data: Buffer): Promise<string> {
+  const { name, ext } = path.parse(filename);
+  for (let attempt = 1; attempt <= 100; attempt++) {
+    const candidate = attempt === 1 ? filename : `${name}-${attempt}${ext}`;
+    try {
+      await writeFile(path.join(dir, candidate), data, { flag: "wx" });
+      return candidate;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    }
+  }
+  throw new Error("Impossible de trouver un nom de fichier libre.");
 }
