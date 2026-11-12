@@ -18,6 +18,7 @@ async function makeUser(overrides: Partial<User> = {}): Promise<User> {
     lockedUntil: null,
     totpSecret: null,
     totpEnabledAt: null,
+    sessionVersion: 0,
     createdAt: NOW,
     ...overrides,
   };
@@ -33,6 +34,7 @@ function fakeRepository(user?: User) {
     setPendingTotpSecret: vi.fn(async () => undefined),
     enableTotp: vi.fn(async () => undefined),
     disableTotp: vi.fn(async () => undefined),
+    revokeSessions: vi.fn(async () => undefined),
   };
   return repo satisfies AdminUserRepository & Record<string, unknown>;
 }
@@ -44,7 +46,7 @@ describe("authService.authenticate", () => {
 
     const result = await createAuthService(repo).authenticate(user.email, PASSWORD, NOW);
 
-    expect(result).toEqual({ ok: true, userId: 1, mfaRequired: false });
+    expect(result).toEqual({ ok: true, userId: 1, sessionVersion: 0, mfaRequired: false });
     expect(repo.updateLockout).toHaveBeenCalledWith(1, { failedLoginCount: 0, lockedUntil: null });
   });
 
@@ -54,7 +56,7 @@ describe("authService.authenticate", () => {
 
     const result = await createAuthService(repo).authenticate(user.email, PASSWORD, NOW);
 
-    expect(result).toEqual({ ok: true, userId: 1, mfaRequired: true });
+    expect(result).toEqual({ ok: true, userId: 1, sessionVersion: 0, mfaRequired: true });
   });
 
   it("refuse un mauvais mot de passe et incrémente le compteur", async () => {

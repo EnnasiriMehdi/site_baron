@@ -19,6 +19,8 @@ async function authenticatedAdminOrNull(): Promise<AuthenticatedAdmin | null> {
 
   const user = await drizzleAdminUserRepository.findById(session.userId);
   if (!user) return null;
+  // Session révoquée (déconnexion, changement de mot de passe ou de 2FA depuis son émission).
+  if (user.sessionVersion !== session.sessionVersion) return null;
 
   return { userId: user.id, email: user.email, totpEnabled: Boolean(user.totpSecret && user.totpEnabledAt) };
 }

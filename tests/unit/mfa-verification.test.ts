@@ -19,6 +19,7 @@ function makeUser(overrides: Partial<User> = {}): User {
     lockedUntil: null,
     totpSecret: null,
     totpEnabledAt: null,
+    sessionVersion: 0,
     createdAt: NOW,
     ...overrides,
   };

@@ -466,6 +466,11 @@ Implémenté dans `features/contact/` (formulaire public, écriture) et `feature
   15 min, 5 essais, 1 envoi/min) pour (a) mot de passe oublié, (b) téléphone perdu — ce second cas
   réinitialise la 2FA et force le réenrôlement. Réponses génériques (pas d'énumération de comptes),
   envoi après réponse (`after()`), e-mail d'alerte après chaque réinitialisation. Voir `architecture_details.md`.
+- **Sessions révocables** : le JWT de session porte `sv` (= `users.session_version`) ; `guards.ts` le
+  compare à la valeur en base et refuse un jeton périmé. La version est incrémentée dans
+  `user-repository.ts` (`updatePasswordHash`, `enableTotp`, `disableTotp`, `revokeSessions`) : changement de
+  mot de passe, de 2FA et déconnexion invalident toutes les sessions. La déconnexion est volontairement
+  « partout ». Toute nouvelle opération sensible sur le compte doit passer par ce dépôt.
 - **Changement de mot de passe** (`/admin/security`, `features/admin-auth/password-actions.ts`,
   `ChangePassword.tsx`) : exige le mot de passe actuel (revérifié via `verifyPassword`) en plus du
   nouveau, jamais la seule session — une session volée ne suffit pas à changer le mot de passe sans

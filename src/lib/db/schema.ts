@@ -12,6 +12,9 @@ export const users = sqliteTable("users", {
   // qu'une fois totpEnabledAt renseigné (code confirmé).
   totpSecret: text("totp_secret"),
   totpEnabledAt: integer("totp_enabled_at", { mode: "timestamp_ms" }),
+  // Numéro de version des sessions : chaque jeton porte la version du moment de sa création ; l'incrémenter
+  // (déconnexion, changement de mot de passe ou de 2FA) invalide d'un coup tous les jetons déjà émis.
+  sessionVersion: integer("session_version").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

@@ -7,7 +7,7 @@ export const MAX_FAILED_ATTEMPTS = 5;
 export const LOCK_DURATION_MS = 15 * 60 * 1000;
 
 export type AuthResult =
-  | { ok: true; userId: number; mfaRequired: boolean }
+  | { ok: true; userId: number; sessionVersion: number; mfaRequired: boolean }
   | { ok: false; reason: "invalid_credentials" | "locked" };
 
 /*
@@ -46,7 +46,12 @@ export function createAuthService(repository: AdminUserRepository) {
         await repository.updateLockout(user.id, { failedLoginCount: 0, lockedUntil: null });
       }
 
-      return { ok: true, userId: user.id, mfaRequired: Boolean(user.totpSecret && user.totpEnabledAt) };
+      return {
+        ok: true,
+        userId: user.id,
+        sessionVersion: user.sessionVersion,
+        mfaRequired: Boolean(user.totpSecret && user.totpEnabledAt),
+      };
     },
   };
 }

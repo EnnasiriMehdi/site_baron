@@ -8,6 +8,7 @@ import { hashPassword } from "./password";
 import { drizzleRecoveryCodeRepository } from "./recovery-code-repository";
 import { generateRecoveryCodes } from "./recovery-codes";
 import { secondFactorCodeSchema } from "./schema";
+import { createSession } from "./session";
 import { buildTotpUri, generateTotpSecret, verifyTotpCode } from "./totp";
 import { drizzleAdminUserRepository } from "./user-repository";
 
@@ -59,6 +60,8 @@ export async function confirmTotpEnrollmentAction(
   }
 
   await drizzleAdminUserRepository.enableTotp(admin.userId);
+  // enableTotp a révoqué les sessions existantes ; on rouvre celle de l'admin en cours d'enrôlement.
+  await createSession(admin.userId);
 
   const plainCodes = generateRecoveryCodes();
   const hashes = await Promise.all(plainCodes.map((code) => hashPassword(code)));
@@ -84,6 +87,8 @@ export async function disableTotpAction(
 
   await drizzleAdminUserRepository.disableTotp(admin.userId);
   await drizzleRecoveryCodeRepository.deleteAll(admin.userId);
+  // Même principe : les autres appareils (ancien téléphone compris) sont déconnectés, pas celui-ci.
+  await createSession(admin.userId);
 
   return { success: true };
 }

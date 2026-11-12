@@ -19,11 +19,14 @@ function signingKey(): Uint8Array {
   return new TextEncoder().encode(getEnv().SESSION_SECRET);
 }
 
+// sessionVersion : version des sessions du compte au moment du mot de passe validé. Si elle change
+// entre-temps (mot de passe modifié ailleurs…), le défi est refusé (voir pending-challenge.ts).
 export async function createPendingMfaChallenge(
   userId: number,
+  sessionVersion: number,
   ttlSeconds: number = PENDING_TTL_SECONDS,
 ): Promise<void> {
-  const token = await new SignJWT({ purpose: "mfa_pending" })
+  const token = await new SignJWT({ purpose: "mfa_pending", sv: sessionVersion })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(String(userId))
     .setIssuer(ISSUER)
@@ -42,7 +45,7 @@ export async function createPendingMfaChallenge(
   });
 }
 
-export async function readPendingMfaChallenge(): Promise<{ userId: number } | null> {
+export async function readPendingMfaChallenge(): Promise<{ userId: number; sessionVersion: number } | null> {
   const store = await cookies();
   const token = store.get(PENDING_COOKIE)?.value;
   if (!token) return null;
@@ -54,7 +57,10 @@ export async function readPendingMfaChallenge(): Promise<{ userId: number } | nu
       audience: AUDIENCE,
     });
     const userId = Number(payload.sub);
-    return Number.isInteger(userId) && userId > 0 ? { userId } : null;
+    const sessionVersion = payload.sv;
+    if (!Number.isInteger(userId) || userId <= 0) return null;
+    if (typeof sessionVersion !== "number" || !Number.isInteger(sessionVersion)) return null;
+    return { userId, sessionVersion };
   } catch {
     return null;
   }

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireAdmin } from "./guards";
 import { hashPassword, verifyPassword } from "./password";
 import { changePasswordSchema } from "./schema";
+import { createSession } from "./session";
 import { drizzleAdminUserRepository } from "./user-repository";
 
 export type ChangePasswordState =
@@ -40,6 +41,9 @@ export async function changePasswordAction(
 
   const passwordHash = await hashPassword(parsed.data.newPassword);
   await drizzleAdminUserRepository.updatePasswordHash(admin.userId, passwordHash);
+  // Le changement a révoqué toutes les sessions (autres appareils, éventuelle copie volée) :
+  // on en rouvre une pour l'admin qui vient de le faire, qui reste ainsi connecté.
+  await createSession(admin.userId);
 
   return { success: true };
 }

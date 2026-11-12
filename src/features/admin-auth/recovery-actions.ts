@@ -9,13 +9,9 @@ import { RateLimiter } from "@/lib/rate-limit";
 
 import { emailCodeService } from "./email-code-service";
 import { LOGIN_PATH, MFA_RECOVER_PATH, MFA_SETUP_PATH } from "./guards";
-import {
-  clearPendingMfaChallenge,
-  createPendingMfaChallenge,
-  EMAIL_RECOVERY_TTL_SECONDS,
-  readPendingMfaChallenge,
-} from "./mfa-session";
+import { clearPendingMfaChallenge, createPendingMfaChallenge, EMAIL_RECOVERY_TTL_SECONDS } from "./mfa-session";
 import { getDummyHash, hashPassword, verifyPassword } from "./password";
+import { loadPendingChallengeUser } from "./pending-challenge";
 import { drizzleRecoveryCodeRepository } from "./recovery-code-repository";
 import { sendRecoveryCodeInBackground, sendSecurityAlertInBackground } from "./recovery-mailing";
 import { emailCodeSchema, passwordResetConfirmSchema, passwordResetRequestSchema } from "./schema";
@@ -43,21 +39,15 @@ const confirmLimiter = new RateLimiter(10, 15 * 60 * 1000);
 export async function requestMfaEmailResetAction(): Promise<MfaRecoveryState> {
   if (!requestLimiter.hit(await clientIp()).allowed) return { error: TOO_MANY_ATTEMPTS_MESSAGE };
 
-  const challenge = await readPendingMfaChallenge();
-  if (!challenge) redirect(LOGIN_PATH);
-
-  const user = await drizzleAdminUserRepository.findById(challenge.userId);
-  if (!user) {
-    await clearPendingMfaChallenge();
-    redirect(LOGIN_PATH);
-  }
+  const user = await loadPendingChallengeUser();
+  if (!user) redirect(LOGIN_PATH);
 
   // null = un code a déjà été envoyé il y a moins d'une minute : il reste valable, on n'en renvoie pas.
   const code = await emailCodeService.issue(user.id, "mfa_reset");
   if (code) sendRecoveryCodeInBackground(user.email, code, "mfa_reset");
 
   // Laisse le temps d'aller lire l'e-mail (le défi initial expire en 5 min).
-  await createPendingMfaChallenge(user.id, EMAIL_RECOVERY_TTL_SECONDS);
+  await createPendingMfaChallenge(user.id, user.sessionVersion, EMAIL_RECOVERY_TTL_SECONDS);
   redirect(MFA_RECOVER_PATH);
 }
 
@@ -71,17 +61,11 @@ export async function confirmMfaEmailResetAction(
 ): Promise<MfaRecoveryState> {
   if (!confirmLimiter.hit(await clientIp()).allowed) return { error: TOO_MANY_ATTEMPTS_MESSAGE };
 
-  const challenge = await readPendingMfaChallenge();
-  if (!challenge) redirect(LOGIN_PATH);
+  const user = await loadPendingChallengeUser();
+  if (!user) redirect(LOGIN_PATH);
 
   const parsed = emailCodeSchema.safeParse(formData.get("code"));
   if (!parsed.success) return { error: INVALID_CODE_MESSAGE };
-
-  const user = await drizzleAdminUserRepository.findById(challenge.userId);
-  if (!user) {
-    await clearPendingMfaChallenge();
-    redirect(LOGIN_PATH);
-  }
 
   if (!(await emailCodeService.verify(user.id, "mfa_reset", parsed.data))) {
     return { error: INVALID_CODE_MESSAGE };
