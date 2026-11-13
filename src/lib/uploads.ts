@@ -1,11 +1,11 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { detectImageType, EXTENSION_BY_IMAGE_TYPE, readImageType } from "./image-type";
-import { MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES } from "./upload-limits";
+import { MAX_FILES, MAX_FILE_BYTES, MAX_STORAGE_BYTES, MAX_TOTAL_BYTES } from "./upload-limits";
 
 /*
  * Stockage des pièces jointes du formulaire de contact. Toujours hors `public/` (data/uploads/,
@@ -76,6 +76,31 @@ export async function storeAttachments(files: File[]): Promise<AttachmentToStore
     });
   }
   return stored;
+}
+
+async function storedBytes(): Promise<number> {
+  let names: string[];
+  try {
+    names = await readdir(UPLOADS_DIR);
+  } catch {
+    return 0; // dossier pas encore créé : rien de stocké
+  }
+  const sizes = await Promise.all(
+    names.map(async (name) => {
+      try {
+        return (await stat(path.join(UPLOADS_DIR, name))).size;
+      } catch {
+        return 0; // fichier disparu entre-temps
+      }
+    }),
+  );
+  return sizes.reduce((sum, size) => sum + size, 0);
+}
+
+// Quota global : mesure ce qui est réellement sur le disque plutôt qu'un compteur en mémoire, qui
+// serait remis à zéro à chaque redémarrage.
+export async function storageHasRoomFor(incomingBytes: number): Promise<boolean> {
+  return (await storedBytes()) + incomingBytes <= MAX_STORAGE_BYTES;
 }
 
 export function resolveUploadPath(storedPath: string): string {

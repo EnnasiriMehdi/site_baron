@@ -1,10 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Valeurs lues par les doubles ci-dessous (vi.mock est hissé avant les imports).
-const mocks = vi.hoisted(() => ({ ip: "203.0.113.1", submit: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  ip: "203.0.113.1",
+  submit: vi.fn(),
+  verifyToken: vi.fn(),
+  hasRoom: vi.fn(),
+}));
 
 vi.mock("@/lib/client-ip", () => ({ clientIp: async () => mocks.ip }));
 vi.mock("@/features/contact/contact-instance", () => ({ contactService: { submit: mocks.submit } }));
+vi.mock("@/features/contact/form-token", () => ({
+  createFormToken: async () => "jeton",
+  verifyFormToken: mocks.verifyToken,
+}));
+// Le quota lit le disque : remplacé par un double. La validation des fichiers reste la vraie.
+vi.mock("@/lib/uploads", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/uploads")>()),
+  storageHasRoomFor: mocks.hasRoom,
+}));
 
 import { submitContactAction } from "@/features/contact/actions";
 import { siteConfig } from "@/config/site";
@@ -31,7 +45,19 @@ beforeEach(() => {
   mocks.ip = `203.0.113.${ipCounter}`;
   mocks.submit.mockReset();
   mocks.submit.mockResolvedValue(1);
+  mocks.verifyToken.mockReset();
+  mocks.verifyToken.mockResolvedValue(true);
+  mocks.hasRoom.mockReset();
+  mocks.hasRoom.mockResolvedValue(true);
 });
+
+const JPEG_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
+
+function formWithPhoto(): FormData {
+  const form = validForm();
+  form.append("attachments", new File([JPEG_BYTES], "panne.jpg", { type: "image/jpeg" }));
+  return form;
+}
 
 describe("submitContactAction", () => {
   it("enregistre une demande valide (données nettoyées) et confirme le succès", async () => {
@@ -111,6 +137,46 @@ describe("submitContactAction", () => {
     for (let i = 0; i < 5; i += 1) await submitContactAction(null, validForm());
     mocks.ip = "198.51.100.200";
 
+    expect(await submitContactAction(null, validForm())).toEqual({ ok: true });
+  });
+
+  it("refuse un envoi sans jeton de formulaire valide, sans rien enregistrer", async () => {
+    mocks.verifyToken.mockResolvedValue(false);
+
+    const result = await submitContactAction(null, validForm());
+
+    expect(result?.ok).toBe(false);
+    if (result && !result.ok) expect(result.error).toContain("expiré");
+    expect(mocks.submit).not.toHaveBeenCalled();
+  });
+
+  it("refuse les pièces jointes quand le quota de stockage est atteint, message toujours possible", async () => {
+    mocks.hasRoom.mockResolvedValue(false);
+
+    const refused = await submitContactAction(null, formWithPhoto());
+    expect(refused?.ok).toBe(false);
+    if (refused && !refused.ok) expect(refused.error).toContain("sans pièce jointe");
+    expect(mocks.submit).not.toHaveBeenCalled();
+
+    // Le même message, sans fichier, passe : on ne perd jamais une demande à cause du quota.
+    expect(await submitContactAction(null, validForm())).toEqual({ ok: true });
+    expect(mocks.hasRoom).toHaveBeenCalledTimes(1);
+  });
+
+  it("plafonne les envois avec pièces jointes pour tout le site, même depuis des IP différentes", async () => {
+    let accepted = 0;
+    let refusedCount = 0;
+    for (let i = 0; i < 40; i += 1) {
+      mocks.ip = `192.0.2.${i + 1}`;
+      const result = await submitContactAction(null, formWithPhoto());
+      if (result?.ok) accepted += 1;
+      else refusedCount += 1;
+    }
+
+    expect(accepted).toBeLessThanOrEqual(30);
+    expect(refusedCount).toBeGreaterThanOrEqual(10);
+    // Sans fichier, le formulaire reste utilisable même quand le plafond global est atteint.
+    mocks.ip = "192.0.2.250";
     expect(await submitContactAction(null, validForm())).toEqual({ ok: true });
   });
 

@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Aucun fichier n'est réellement écrit : on observe ce que le module demanderait d'écrire.
-const fsMocks = vi.hoisted(() => ({ writeFile: vi.fn(), mkdir: vi.fn() }));
+const fsMocks = vi.hoisted(() => ({
+  writeFile: vi.fn(),
+  mkdir: vi.fn(),
+  readdir: vi.fn(),
+  stat: vi.fn(),
+}));
 vi.mock("node:fs/promises", () => fsMocks);
 
 import { storePublicImage, validatePublicImage } from "@/lib/public-image-upload";
-import { MAX_FILES, MAX_FILE_BYTES } from "@/lib/upload-limits";
-import { storeAttachments, validateAttachments } from "@/lib/uploads";
+import { MAX_FILES, MAX_FILE_BYTES, MAX_STORAGE_BYTES, MAX_TOTAL_BYTES } from "@/lib/upload-limits";
+import { storageHasRoomFor, storeAttachments, validateAttachments } from "@/lib/uploads";
 
 const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d];
 const JPEG = [0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46];
@@ -19,6 +24,8 @@ function file(bytes: ArrayLike<number>, name: string, type: string): File {
 beforeEach(() => {
   fsMocks.writeFile.mockReset().mockResolvedValue(undefined);
   fsMocks.mkdir.mockReset().mockResolvedValue(undefined);
+  fsMocks.readdir.mockReset().mockResolvedValue([]);
+  fsMocks.stat.mockReset().mockResolvedValue({ size: 0 });
 });
 
 describe("validateAttachments", () => {
@@ -53,6 +60,18 @@ describe("validateAttachments", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("refuse un envoi dont le total dépasse la limite, même si chaque fichier passe", async () => {
+    // 3 fichiers de la taille maximale : chacun passe seul, mais ensemble ils dépassent le total.
+    const perFile = MAX_FILE_BYTES - PNG.length;
+    expect(perFile * 3).toBeGreaterThan(MAX_TOTAL_BYTES);
+    const files = [1, 2, 3].map((i) => file([...PNG, ...new Array(perFile).fill(0)], `${i}.png`, "image/png"));
+
+    const result = await validateAttachments(files);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("total");
+  });
+
   it("refuse un fichier trop lourd", async () => {
     const big = file([...PNG, ...new Array(MAX_FILE_BYTES).fill(0)], "gros.png", "image/png");
     const result = await validateAttachments([big]);
@@ -77,6 +96,28 @@ describe("storeAttachments", () => {
   it("refuse d'écrire un contenu qui n'est pas une image", async () => {
     await expect(storeAttachments([file(text("<html>"), "x.png", "image/png")])).rejects.toThrow();
     expect(fsMocks.writeFile).not.toHaveBeenCalled();
+  });
+});
+
+describe("storageHasRoomFor (quota global)", () => {
+  it("accepte tant que le total stocké + l'envoi tient dans le plafond", async () => {
+    fsMocks.readdir.mockResolvedValue(["a.jpg", "b.jpg"]);
+    fsMocks.stat.mockResolvedValue({ size: 1000 });
+
+    expect(await storageHasRoomFor(1000)).toBe(true);
+  });
+
+  it("refuse dès que le plafond serait dépassé", async () => {
+    fsMocks.readdir.mockResolvedValue(["a.jpg", "b.jpg"]);
+    fsMocks.stat.mockResolvedValue({ size: MAX_STORAGE_BYTES / 2 });
+
+    expect(await storageHasRoomFor(1)).toBe(false);
+  });
+
+  it("considère le dossier vide s'il n'existe pas encore", async () => {
+    fsMocks.readdir.mockRejectedValue(Object.assign(new Error("absent"), { code: "ENOENT" }));
+
+    expect(await storageHasRoomFor(1024)).toBe(true);
   });
 });
 

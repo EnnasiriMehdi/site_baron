@@ -1,10 +1,10 @@
 "use client";
 
-import { useActionState, useRef, useState, type ChangeEvent } from "react";
+import { useActionState, useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { ALLOWED_IMAGE_MIME_TYPES, MAX_FILES, MAX_FILE_BYTES } from "@/lib/upload-limits";
 
-import { submitContactAction, type ContactFormState } from "../actions";
+import { issueFormTokenAction, submitContactAction, type ContactFormState } from "../actions";
 import { compressImage } from "../image-compression";
 import { ContactSuccess } from "./ContactSuccess";
 
@@ -34,6 +34,16 @@ export function ContactForm() {
   // Numéro de la sélection en cours : si le visiteur change ses fichiers pendant l'allègement,
   // le résultat de l'ancienne sélection est ignoré.
   const selectionId = useRef(0);
+
+  // Jeton anti-robot (form-token.ts) demandé à l'affichage : la page de contact est statique, un jeton
+  // ne peut donc pas être intégré au rendu. Sans lui (script qui poste sans charger la page), l'envoi
+  // est refusé par le serveur.
+  const [formToken, setFormToken] = useState("");
+  useEffect(() => {
+    issueFormTokenAction()
+      .then(setFormToken)
+      .catch(() => undefined); // échec : le serveur refusera l'envoi avec un message invitant à recharger
+  }, []);
 
   // Les photos sont allégées ici (image-compression.ts) puis remplacent la sélection du champ : le
   // formulaire envoie ensuite les versions légères, sans autre changement.
@@ -80,6 +90,7 @@ export function ContactForm() {
       aria-describedby={state && !state.ok && state.error ? "contact-error" : undefined}
     >
       {/* Honeypot : invisible et ignoré par un visiteur, souvent rempli par un robot (CLAUDE.md, 8.2). */}
+      <input type="hidden" name="formToken" value={formToken} />
       <div className="hidden" aria-hidden="true">
         <label htmlFor="company">Laissez ce champ vide</label>
         <input id="company" name="company" type="text" tabIndex={-1} autoComplete="off" />
