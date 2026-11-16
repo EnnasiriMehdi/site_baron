@@ -31,6 +31,11 @@ export class RateLimiter {
     return { allowed: true };
   }
 
+  // Remet le compteur d'une clé à zéro (ex. après une réussite : on ne compte que les échecs consécutifs).
+  reset(key: string): void {
+    this.hits.delete(key);
+  }
+
   // Évite que la mémoire grossisse indéfiniment avec des IP qui ne reviennent plus.
   private prune(now: number): void {
     if (this.hits.size < 1000) return;

@@ -9,6 +9,7 @@ import { RateLimiter } from "@/lib/rate-limit";
 
 import { emailCodeService } from "./email-code-service";
 import { LOGIN_PATH, MFA_RECOVER_PATH, MFA_SETUP_PATH } from "./guards";
+import { clearMfaAttempts } from "./mfa-rate-limit";
 import { clearPendingMfaChallenge, createPendingMfaChallenge, EMAIL_RECOVERY_TTL_SECONDS } from "./mfa-session";
 import { getDummyHash, hashPassword, verifyPassword } from "./password";
 import { loadPendingChallengeUser } from "./pending-challenge";
@@ -73,6 +74,9 @@ export async function confirmMfaEmailResetAction(
 
   await drizzleAdminUserRepository.disableTotp(user.id);
   await drizzleRecoveryCodeRepository.deleteAll(user.id);
+  // Le code reçu par e-mail prouve l'identité : on lève le blocage 2FA, sinon l'enrôlement qui suit
+  // (même budget de tentatives) resterait refusé si un attaquant l'avait épuisé.
+  clearMfaAttempts(user.id);
   sendSecurityAlertInBackground(user.email, "mfa_reset");
 
   await clearPendingMfaChallenge();
@@ -132,6 +136,7 @@ export async function confirmPasswordResetAction(
   await drizzleAdminUserRepository.updatePasswordHash(user.id, await hashPassword(parsed.data.newPassword));
   // Le verrouillage (5 échecs) est levé : l'admin vient de prouver son identité par e-mail.
   await drizzleAdminUserRepository.updateLockout(user.id, { failedLoginCount: 0, lockedUntil: null });
+  clearMfaAttempts(user.id);
   sendSecurityAlertInBackground(user.email, "password_reset");
 
   return { success: true };

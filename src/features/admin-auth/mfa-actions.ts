@@ -7,6 +7,8 @@ import { RateLimiter } from "@/lib/rate-limit";
 
 import { LOGIN_PATH } from "./guards";
 import { clearPendingMfaChallenge } from "./mfa-session";
+import { allowMfaAttempt } from "./mfa-attempt-guard";
+import { clearMfaAttempts, MFA_TOO_MANY_ATTEMPTS_MESSAGE } from "./mfa-rate-limit";
 import { verifySecondFactor } from "./mfa-verification";
 import { loadPendingChallengeUser } from "./pending-challenge";
 import { secondFactorCodeSchema } from "./schema";
@@ -32,6 +34,11 @@ export async function verifyMfaAction(_previous: MfaFormState, formData: FormDat
     redirect(LOGIN_PATH);
   }
 
+  // Plafond par compte, avant toute vérification (même un code mal formé consomme un essai).
+  if (!allowMfaAttempt(user.id, user.email)) {
+    return { error: MFA_TOO_MANY_ATTEMPTS_MESSAGE };
+  }
+
   const parsed = secondFactorCodeSchema.safeParse(formData.get("code"));
   if (!parsed.success) {
     return { error: INVALID_CODE_MESSAGE };
@@ -42,6 +49,7 @@ export async function verifyMfaAction(_previous: MfaFormState, formData: FormDat
     return { error: INVALID_CODE_MESSAGE };
   }
 
+  clearMfaAttempts(user.id);
   await clearPendingMfaChallenge();
   await createSession(user.id);
   redirect("/admin");

@@ -8,6 +8,7 @@ import { RateLimiter } from "@/lib/rate-limit";
 
 import { authService } from "./auth-instance";
 import { LOGIN_PATH, MFA_VERIFY_PATH } from "./guards";
+import { alertLoginLocked } from "./login-lockout-alert";
 import { createPendingMfaChallenge } from "./mfa-session";
 import { destroySession, createSession, readSession } from "./session";
 import { loginSchema } from "./schema";
@@ -42,6 +43,7 @@ export async function loginAction(_previous: LoginFormState, formData: FormData)
 
   const result = await authService.authenticate(parsed.data.email, parsed.data.password);
   if (!result.ok) {
+    if (result.lockedEmail) alertLoginLocked(result.lockedEmail);
     return { error: INVALID_CREDENTIALS_MESSAGE };
   }
 

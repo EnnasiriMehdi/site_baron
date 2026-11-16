@@ -42,7 +42,10 @@ export function sendRecoveryCodeInBackground(
   });
 }
 
-export function sendSecurityAlertInBackground(recipientEmail: string, kind: EmailCodePurpose): void {
+// "mfa_locked" / "login_locked" : blocages (plafond 2FA, 5 mots de passe erronés), pas des récupérations.
+export type SecurityAlertKind = EmailCodePurpose | "mfa_locked" | "login_locked";
+
+export function sendSecurityAlertInBackground(recipientEmail: string, kind: SecurityAlertKind): void {
   after(async () => {
     try {
       await notificationService.sendAdminSecurityAlert(recipientEmail, { kind });

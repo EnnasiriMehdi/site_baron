@@ -3,6 +3,8 @@
 import QRCode from "qrcode";
 
 import { requireAdminSession } from "./guards";
+import { allowMfaAttempt } from "./mfa-attempt-guard";
+import { clearMfaAttempts, MFA_TOO_MANY_ATTEMPTS_MESSAGE } from "./mfa-rate-limit";
 import { verifySecondFactor } from "./mfa-verification";
 import { hashPassword } from "./password";
 import { drizzleRecoveryCodeRepository } from "./recovery-code-repository";
@@ -47,6 +49,8 @@ export async function confirmTotpEnrollmentAction(
 ): Promise<EnrollmentConfirmState> {
   const admin = await requireAdminSession();
 
+  if (!allowMfaAttempt(admin.userId, admin.email)) return { error: MFA_TOO_MANY_ATTEMPTS_MESSAGE };
+
   const parsed = secondFactorCodeSchema.safeParse(formData.get("code"));
   if (!parsed.success) return { error: INVALID_CODE_MESSAGE };
 
@@ -59,6 +63,7 @@ export async function confirmTotpEnrollmentAction(
     return { error: INVALID_CODE_MESSAGE };
   }
 
+  clearMfaAttempts(admin.userId);
   await drizzleAdminUserRepository.enableTotp(admin.userId);
   // enableTotp a révoqué les sessions existantes ; on rouvre celle de l'admin en cours d'enrôlement.
   await createSession(admin.userId);
@@ -76,6 +81,8 @@ export async function disableTotpAction(
 ): Promise<DisableMfaState> {
   const admin = await requireAdminSession();
 
+  if (!allowMfaAttempt(admin.userId, admin.email)) return { error: MFA_TOO_MANY_ATTEMPTS_MESSAGE };
+
   const parsed = secondFactorCodeSchema.safeParse(formData.get("code"));
   if (!parsed.success) return { error: INVALID_CODE_MESSAGE };
 
@@ -85,6 +92,7 @@ export async function disableTotpAction(
   const outcome = await verifySecondFactor(user, parsed.data);
   if (outcome === "invalid") return { error: INVALID_CODE_MESSAGE };
 
+  clearMfaAttempts(admin.userId);
   await drizzleAdminUserRepository.disableTotp(admin.userId);
   await drizzleRecoveryCodeRepository.deleteAll(admin.userId);
   // Même principe : les autres appareils (ancien téléphone compris) sont déconnectés, pas celui-ci.
