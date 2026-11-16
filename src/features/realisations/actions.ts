@@ -34,7 +34,7 @@ export async function createRealisationAction(
     return { error: "Une photo est requise." };
   }
 
-  const imageCheck = validatePublicImage(photo);
+  const imageCheck = await validatePublicImage(photo);
   if (!imageCheck.ok) {
     return { error: imageCheck.error };
   }
@@ -52,7 +52,7 @@ export async function createRealisationAction(
       return { error: `Texte alternatif requis pour la photo ${slot}.` };
     }
 
-    const extraCheck = validatePublicImage(extraPhoto);
+    const extraCheck = await validatePublicImage(extraPhoto);
     if (!extraCheck.ok) {
       return { error: `Photo ${slot} : ${extraCheck.error}` };
     }

@@ -28,9 +28,11 @@ export function buildTotpUri(email: string, secret: string): string {
 }
 
 /*
- * Accepte une petite tolérance d'horloge (une période avant/après) : window: 1.
- * Retourne true une seule fois par code : otpauth ne protège pas du rejeu à lui seul,
- * mais un code TOTP n'est valide que 30 à 60 secondes, ce qui limite fortement le risque.
+ * Accepte une petite tolérance d'horloge (une période avant/après) : window: 1, soit environ
+ * 90 secondes de validité au total.
+ * Un code n'est PAS à usage unique : rien ne mémorise qu'il a déjà servi, il peut être rejoué
+ * dans cette fenêtre. Risque accepté (il faut déjà le mot de passe et voir le code), voir
+ * claude_perso/report.md. Correctif possible : mémoriser le dernier compteur accepté.
  */
 export function verifyTotpCode(email: string, secret: string, code: string): boolean {
   const delta = buildTotp(email, secret).validate({ token: code, window: 1 });

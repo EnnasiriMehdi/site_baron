@@ -18,8 +18,8 @@ const envSchema = z.object({
     .min(1)
     .regex(/^[\w.-]+\.db$/, "Doit être un nom de fichier simple se terminant par .db")
     .default("site.db"),
-  // SMTP Google (Gmail) pour l'e-mail de confirmation après envoi du formulaire de contact
-  // (features/notifications). SMTP_USER/SMTP_PASSWORD restent optionnels ici pour ne jamais casser
+  // SMTP Google (Gmail) pour les e-mails envoyés par l'application : codes et alertes de récupération
+  // du compte admin (features/notifications). SMTP_USER/SMTP_PASSWORD restent optionnels ici pour ne jamais casser
   // le démarrage en développement (où le mailer console est utilisé, cf. lib/mailer) ; ils sont
   // vérifiés et exigés uniquement au moment de construire le mailer SMTP réel, en production.
   SMTP_HOST: z.string().min(1).default("smtp.gmail.com"),

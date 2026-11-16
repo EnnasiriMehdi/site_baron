@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { siteConfig } from "@/config/site";
 import { faq } from "@/content/faq";
 import { isPlaceholder } from "@/lib/content-guard";
+import { serializeJsonLd } from "@/lib/json-ld";
 import { drizzleRealisationRepository } from "@/features/realisations";
 import { FaqSection } from "@/components/sections/FaqSection";
 import { FinalCtaSection } from "@/components/sections/FinalCtaSection";
@@ -62,8 +63,8 @@ function LocalBusinessJsonLd() {
       : {}),
   };
 
-  // JSON-LD généré côté serveur à partir de données de confiance (config/site.ts), pas d'entrée utilisateur.
-  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />;
+  // Données de confiance (config/site.ts), mais "<" est quand même échappé par serializeJsonLd.
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />;
 }
 
 function FaqJsonLd() {
@@ -77,8 +78,8 @@ function FaqJsonLd() {
     })),
   };
 
-  // Même raisonnement que LocalBusinessJsonLd : données de confiance (content/faq.ts), pas d'entrée utilisateur.
-  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />;
+  // Même raisonnement que LocalBusinessJsonLd (content/faq.ts).
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />;
 }
 
 export default async function HomePage() {

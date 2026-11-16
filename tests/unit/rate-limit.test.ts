@@ -23,4 +23,15 @@ describe("RateLimiter", () => {
     limiter.hit("a", 0);
     expect(limiter.hit("b", 0).allowed).toBe(true);
   });
+
+  it("reset remet à zéro une seule clé", () => {
+    const limiter = new RateLimiter(1, 1000);
+    limiter.hit("a", 0);
+    limiter.hit("b", 0);
+
+    limiter.reset("a");
+
+    expect(limiter.hit("a", 1).allowed).toBe(true);
+    expect(limiter.hit("b", 1).allowed).toBe(false);
+  });
 });

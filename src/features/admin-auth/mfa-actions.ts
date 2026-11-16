@@ -6,11 +6,13 @@ import { clientIp } from "@/lib/client-ip";
 import { RateLimiter } from "@/lib/rate-limit";
 
 import { LOGIN_PATH } from "./guards";
-import { clearPendingMfaChallenge, readPendingMfaChallenge } from "./mfa-session";
+import { clearPendingMfaChallenge } from "./mfa-session";
+import { allowMfaAttempt } from "./mfa-attempt-guard";
+import { clearMfaAttempts, MFA_TOO_MANY_ATTEMPTS_MESSAGE } from "./mfa-rate-limit";
 import { verifySecondFactor } from "./mfa-verification";
+import { loadPendingChallengeUser } from "./pending-challenge";
 import { secondFactorCodeSchema } from "./schema";
 import { createSession } from "./session";
-import { drizzleAdminUserRepository } from "./user-repository";
 
 export type MfaFormState = { error?: string } | null;
 
@@ -27,9 +29,14 @@ export async function verifyMfaAction(_previous: MfaFormState, formData: FormDat
     return { error: TOO_MANY_ATTEMPTS_MESSAGE };
   }
 
-  const challenge = await readPendingMfaChallenge();
-  if (!challenge) {
+  const user = await loadPendingChallengeUser();
+  if (!user) {
     redirect(LOGIN_PATH);
+  }
+
+  // Plafond par compte, avant toute vérification (même un code mal formé consomme un essai).
+  if (!allowMfaAttempt(user.id, user.email)) {
+    return { error: MFA_TOO_MANY_ATTEMPTS_MESSAGE };
   }
 
   const parsed = secondFactorCodeSchema.safeParse(formData.get("code"));
@@ -37,17 +44,12 @@ export async function verifyMfaAction(_previous: MfaFormState, formData: FormDat
     return { error: INVALID_CODE_MESSAGE };
   }
 
-  const user = await drizzleAdminUserRepository.findById(challenge.userId);
-  if (!user) {
-    await clearPendingMfaChallenge();
-    redirect(LOGIN_PATH);
-  }
-
   const outcome = await verifySecondFactor(user, parsed.data);
   if (outcome === "invalid") {
     return { error: INVALID_CODE_MESSAGE };
   }
 
+  clearMfaAttempts(user.id);
   await clearPendingMfaChallenge();
   await createSession(user.id);
   redirect("/admin");

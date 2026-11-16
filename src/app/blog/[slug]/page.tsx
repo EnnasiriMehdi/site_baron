@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { siteConfig } from "@/config/site";
 import { drizzleArticleRepository } from "@/features/articles";
+import { serializeJsonLd } from "@/lib/json-ld";
 import { renderArticleBody } from "@/lib/markdown";
 import { BannerPlaceholder } from "@/components/ui/BannerPlaceholder";
 
@@ -60,7 +61,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
   return (
     <main id="contenu" className="mx-auto max-w-3xl px-4 py-14 sm:py-16">
       {/* Données de confiance (base, admin uniquement) : jamais d'entrée utilisateur non échappée. */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
 
       <div className="relative aspect-[16/9] w-full overflow-hidden rounded-(--radius-lg)">
         {article.coverImagePath ? (

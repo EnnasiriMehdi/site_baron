@@ -18,6 +18,7 @@ async function makeUser(overrides: Partial<User> = {}): Promise<User> {
     lockedUntil: null,
     totpSecret: null,
     totpEnabledAt: null,
+    sessionVersion: 0,
     createdAt: NOW,
     ...overrides,
   };
@@ -33,6 +34,7 @@ function fakeRepository(user?: User) {
     setPendingTotpSecret: vi.fn(async () => undefined),
     enableTotp: vi.fn(async () => undefined),
     disableTotp: vi.fn(async () => undefined),
+    revokeSessions: vi.fn(async () => undefined),
   };
   return repo satisfies AdminUserRepository & Record<string, unknown>;
 }
@@ -44,7 +46,7 @@ describe("authService.authenticate", () => {
 
     const result = await createAuthService(repo).authenticate(user.email, PASSWORD, NOW);
 
-    expect(result).toEqual({ ok: true, userId: 1, mfaRequired: false });
+    expect(result).toEqual({ ok: true, userId: 1, sessionVersion: 0, mfaRequired: false });
     expect(repo.updateLockout).toHaveBeenCalledWith(1, { failedLoginCount: 0, lockedUntil: null });
   });
 
@@ -54,7 +56,7 @@ describe("authService.authenticate", () => {
 
     const result = await createAuthService(repo).authenticate(user.email, PASSWORD, NOW);
 
-    expect(result).toEqual({ ok: true, userId: 1, mfaRequired: true });
+    expect(result).toEqual({ ok: true, userId: 1, sessionVersion: 0, mfaRequired: true });
   });
 
   it("refuse un mauvais mot de passe et incrémente le compteur", async () => {
@@ -77,6 +79,26 @@ describe("authService.authenticate", () => {
       failedLoginCount: 0,
       lockedUntil: new Date(NOW.getTime() + LOCK_DURATION_MS),
     });
+  });
+
+  it("signale l'adresse enregistrée du compte seulement quand cette tentative verrouille", async () => {
+    const user = await makeUser({ failedLoginCount: MAX_FAILED_ATTEMPTS - 1 });
+    const repo = fakeRepository(user);
+
+    const result = await createAuthService(repo).authenticate(user.email, "mauvais", NOW);
+
+    expect(result).toEqual({ ok: false, reason: "invalid_credentials", lockedEmail: user.email });
+  });
+
+  it("ne signale rien pour un échec ordinaire ni pendant un verrouillage déjà en cours", async () => {
+    const ordinary = await makeUser({ failedLoginCount: 0 });
+    const alreadyLocked = await makeUser({ lockedUntil: new Date(NOW.getTime() + 60_000) });
+
+    const first = await createAuthService(fakeRepository(ordinary)).authenticate(ordinary.email, "mauvais", NOW);
+    const second = await createAuthService(fakeRepository(alreadyLocked)).authenticate(alreadyLocked.email, "mauvais", NOW);
+
+    expect(first).not.toHaveProperty("lockedEmail");
+    expect(second).not.toHaveProperty("lockedEmail");
   });
 
   it("refuse la connexion pendant le verrouillage, même avec le bon mot de passe", async () => {

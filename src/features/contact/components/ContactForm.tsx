@@ -1,14 +1,16 @@
 "use client";
 
-import { useActionState, useState, type ChangeEvent } from "react";
+import { useActionState, useEffect, useRef, useState, type ChangeEvent } from "react";
 
-import { ALLOWED_MIME_TYPES, MAX_FILES, MAX_FILE_BYTES } from "@/lib/upload-limits";
+import { ALLOWED_IMAGE_MIME_TYPES, MAX_FILES, MAX_FILE_BYTES } from "@/lib/upload-limits";
 
-import { submitContactAction, type ContactFormState } from "../actions";
+import { issueFormTokenAction, submitContactAction, type ContactFormState } from "../actions";
+import { compressImage } from "../image-compression";
+import { ContactSuccess } from "./ContactSuccess";
 
 const initialState: ContactFormState = null;
 const MAX_FILE_MB = MAX_FILE_BYTES / 1024 / 1024;
-const ACCEPT_ATTR = ALLOWED_MIME_TYPES.join(",");
+const ACCEPT_ATTR = ALLOWED_IMAGE_MIME_TYPES.join(",");
 
 const inputClass =
   "mt-1 w-full rounded-(--radius-md) border border-(--color-border) bg-(--color-surface) px-3 py-2.5 text-base text-(--color-text)";
@@ -28,31 +30,57 @@ export function ContactForm() {
   // Confort immédiat seulement : la vraie limite est revérifiée côté serveur (lib/uploads.ts),
   // avec la même constante partagée (CLAUDE.md, 7quater.2).
   const [fileError, setFileError] = useState<string | null>(null);
+  const [compressing, setCompressing] = useState(false);
+  // Numéro de la sélection en cours : si le visiteur change ses fichiers pendant l'allègement,
+  // le résultat de l'ancienne sélection est ignoré.
+  const selectionId = useRef(0);
 
-  function handleFilesChange(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []);
+  // Jeton anti-robot (form-token.ts) demandé à l'affichage : la page de contact est statique, un jeton
+  // ne peut donc pas être intégré au rendu. Sans lui (script qui poste sans charger la page), l'envoi
+  // est refusé par le serveur.
+  const [formToken, setFormToken] = useState("");
+  useEffect(() => {
+    issueFormTokenAction()
+      .then(setFormToken)
+      .catch(() => undefined); // échec : le serveur refusera l'envoi avec un message invitant à recharger
+  }, []);
+
+  // Les photos sont allégées ici (image-compression.ts) puis remplacent la sélection du champ : le
+  // formulaire envoie ensuite les versions légères, sans autre changement.
+  async function handleFilesChange(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget; // à lire avant tout await
+    const files = Array.from(input.files ?? []);
+    const currentSelection = ++selectionId.current;
+
     if (files.length > MAX_FILES) {
+      setCompressing(false);
       setFileError(`${MAX_FILES} pièces jointes maximum (${files.length} sélectionnées).`);
       return;
     }
-    const tooLarge = files.find((file) => file.size > MAX_FILE_BYTES);
+
+    setFileError(null);
+    setCompressing(files.length > 0);
+
+    const optimized: File[] = [];
+    for (const file of files) {
+      optimized.push(await compressImage(file));
+    }
+    if (currentSelection !== selectionId.current) return;
+    setCompressing(false);
+
+    const tooLarge = optimized.find((file) => file.size > MAX_FILE_BYTES);
     if (tooLarge) {
-      setFileError(`"${tooLarge.name}" dépasse ${MAX_FILE_MB} Mo.`);
+      setFileError(`"${tooLarge.name}" dépasse ${MAX_FILE_MB} Mo, même après allègement.`);
       return;
     }
-    setFileError(null);
+
+    const transfer = new DataTransfer();
+    optimized.forEach((file) => transfer.items.add(file));
+    input.files = transfer.files;
   }
 
   if (state?.ok) {
-    return (
-      <div role="status" className="rounded-(--radius-lg) border border-(--color-border) bg-(--color-surface) p-6">
-        <p className="font-semibold text-(--color-primary)">Votre demande a bien été envoyée.</p>
-        <p className="mt-2 text-sm text-(--color-text-muted)">
-          Nous revenons vers vous par téléphone ou par e-mail. Pour une urgence, appeler reste le moyen le
-          plus rapide d&apos;être pris en charge.
-        </p>
-      </div>
-    );
+    return <ContactSuccess />;
   }
 
   return (
@@ -62,6 +90,7 @@ export function ContactForm() {
       aria-describedby={state && !state.ok && state.error ? "contact-error" : undefined}
     >
       {/* Honeypot : invisible et ignoré par un visiteur, souvent rempli par un robot (CLAUDE.md, 8.2). */}
+      <input type="hidden" name="formToken" value={formToken} />
       <div className="hidden" aria-hidden="true">
         <label htmlFor="company">Laissez ce champ vide</label>
         <input id="company" name="company" type="text" tabIndex={-1} autoComplete="off" />
@@ -164,9 +193,14 @@ export function ContactForm() {
           className={`${inputClass} file:mr-3 file:rounded-(--radius-md) file:border-0 file:bg-(--color-primary-soft) file:px-3 file:py-2 file:text-(--color-primary)`}
         />
         <p id="attachments-help" className="mt-1 text-sm text-(--color-text-muted)">
-          Photos ou PDF, {MAX_FILES} fichiers maximum, {MAX_FILE_MB} Mo par fichier (ex. : photo de la panne,
-          devis existant).
+          Photos ou captures d&apos;écran (JPG, PNG, WEBP), {MAX_FILES} fichiers maximum (ex. : photo de la
+          panne, capture d&apos;un devis). Elles sont allégées automatiquement avant l&apos;envoi.
         </p>
+        {compressing && (
+          <p role="status" className="mt-1 text-sm text-(--color-text-muted)">
+            Optimisation des photos en cours…
+          </p>
+        )}
         {fileError && (
           <p id="attachments-error" role="alert" className="mt-1 text-sm text-(--color-danger)">
             {fileError}
@@ -184,10 +218,10 @@ export function ContactForm() {
 
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || compressing}
         className="min-h-11 self-start rounded-(--radius-md) border border-(--color-primary) px-6 py-3 font-semibold text-(--color-primary) disabled:opacity-60"
       >
-        {pending ? "Envoi en cours…" : "Envoyer ma demande"}
+        {pending ? "Envoi en cours…" : compressing ? "Optimisation des photos…" : "Envoyer ma demande"}
       </button>
     </form>
   );

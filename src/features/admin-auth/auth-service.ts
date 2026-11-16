@@ -7,8 +7,10 @@ export const MAX_FAILED_ATTEMPTS = 5;
 export const LOCK_DURATION_MS = 15 * 60 * 1000;
 
 export type AuthResult =
-  | { ok: true; userId: number; mfaRequired: boolean }
-  | { ok: false; reason: "invalid_credentials" | "locked" };
+  | { ok: true; userId: number; sessionVersion: number; mfaRequired: boolean }
+  // lockedEmail : présent seulement quand CETTE tentative vient de verrouiller le compte. C'est l'adresse
+  // enregistrée du compte (jamais celle saisie dans le formulaire) : destinataire de l'alerte (CLAUDE.md, section 9).
+  | { ok: false; reason: "invalid_credentials" | "locked"; lockedEmail?: string };
 
 /*
  * Règle métier de connexion : vérification du mot de passe et verrouillage temporaire du compte.
@@ -39,14 +41,19 @@ export function createAuthService(repository: AdminUserRepository) {
           failedLoginCount: shouldLock ? 0 : failures,
           lockedUntil: shouldLock ? new Date(now.getTime() + LOCK_DURATION_MS) : null,
         });
-        return { ok: false, reason: "invalid_credentials" };
+        return { ok: false, reason: "invalid_credentials", ...(shouldLock ? { lockedEmail: user.email } : {}) };
       }
 
       if (user.failedLoginCount > 0 || user.lockedUntil) {
         await repository.updateLockout(user.id, { failedLoginCount: 0, lockedUntil: null });
       }
 
-      return { ok: true, userId: user.id, mfaRequired: Boolean(user.totpSecret && user.totpEnabledAt) };
+      return {
+        ok: true,
+        userId: user.id,
+        sessionVersion: user.sessionVersion,
+        mfaRequired: Boolean(user.totpSecret && user.totpEnabledAt),
+      };
     },
   };
 }

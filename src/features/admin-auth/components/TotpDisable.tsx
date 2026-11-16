@@ -10,14 +10,19 @@ export function TotpDisable() {
   const [state, formAction, pending] = useActionState(disableTotpAction, initialState);
 
   if (state && "success" in state) {
-    return <p className="text-(--color-text-muted)">Double authentification désactivée. Rechargez la page.</p>;
+    return (
+      <p className="text-(--color-text-muted)">
+        Ancien téléphone déconnecté. Rechargez la page pour configurer le nouveau.
+      </p>
+    );
   }
 
   return (
     <form action={formAction} className="flex flex-col gap-3">
       <p className="text-(--color-text-muted)">
-        La double authentification est active. Pour la désactiver, confirmez avec un code de votre
-        application ou un code de secours.
+        La double authentification est active (elle est obligatoire). Pour changer de téléphone,
+        confirmez avec un code de votre application ou un code de secours : vous configurerez ensuite le
+        nouvel appareil.
       </p>
       <label htmlFor="disable-code" className="block text-sm font-medium">
         Code de confirmation
@@ -44,7 +49,7 @@ export function TotpDisable() {
         disabled={pending}
         className="min-h-11 self-start rounded-(--radius-md) border border-(--color-danger) px-4 py-3 font-semibold text-(--color-danger) disabled:opacity-60"
       >
-        {pending ? "Désactivation…" : "Désactiver la double authentification"}
+        {pending ? "Vérification…" : "Changer de téléphone"}
       </button>
     </form>
   );

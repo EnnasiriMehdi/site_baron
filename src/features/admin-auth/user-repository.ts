@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import { users, type User } from "@/lib/db/schema";
@@ -17,6 +17,7 @@ export interface AdminUserRepository {
   setPendingTotpSecret(id: number, secret: string): Promise<void>;
   enableTotp(id: number): Promise<void>;
   disableTotp(id: number): Promise<void>;
+  revokeSessions(id: number, currentVersion: number): Promise<void>;
 }
 
 export const drizzleAdminUserRepository: AdminUserRepository = {
@@ -37,21 +38,47 @@ export const drizzleAdminUserRepository: AdminUserRepository = {
       .where(eq(users.id, id));
   },
 
+  // Changer le mot de passe invalide toutes les sessions existantes (incrément fait ici, pas dans
+  // l'action : impossible à oublier). L'appelant rouvre une session s'il doit rester connecté.
   async updatePasswordHash(id, passwordHash) {
-    await getDb().update(users).set({ passwordHash }).where(eq(users.id, id));
+    await getDb()
+      .update(users)
+      .set({ passwordHash, sessionVersion: sql`${users.sessionVersion} + 1` })
+      .where(eq(users.id, id));
   },
 
   // Le secret est stocké dès le début de l'inscription, mais totpEnabledAt reste vide
   // jusqu'à la confirmation (enableTotp) : un secret non confirmé n'active jamais le 2FA.
+  // La condition isNull(totpEnabledAt) est une défense en profondeur : même si une action oubliait
+  // de vérifier, un secret ne peut jamais écraser celui d'une 2FA déjà active.
   async setPendingTotpSecret(id, secret) {
-    await getDb().update(users).set({ totpSecret: secret, totpEnabledAt: null }).where(eq(users.id, id));
+    await getDb()
+      .update(users)
+      .set({ totpSecret: secret })
+      .where(and(eq(users.id, id), isNull(users.totpEnabledAt)));
   },
 
+  // Activer ou désactiver la 2FA change la confiance accordée aux sessions existantes : on les révoque.
   async enableTotp(id) {
-    await getDb().update(users).set({ totpEnabledAt: new Date() }).where(eq(users.id, id));
+    await getDb()
+      .update(users)
+      .set({ totpEnabledAt: new Date(), sessionVersion: sql`${users.sessionVersion} + 1` })
+      .where(eq(users.id, id));
   },
 
   async disableTotp(id) {
-    await getDb().update(users).set({ totpSecret: null, totpEnabledAt: null }).where(eq(users.id, id));
+    await getDb()
+      .update(users)
+      .set({ totpSecret: null, totpEnabledAt: null, sessionVersion: sql`${users.sessionVersion} + 1` })
+      .where(eq(users.id, id));
+  },
+
+  // Conditionnel à la version du jeton présenté : un cookie déjà révoqué ne peut pas redéclencher
+  // une déconnexion générale de l'admin légitime.
+  async revokeSessions(id, currentVersion) {
+    await getDb()
+      .update(users)
+      .set({ sessionVersion: sql`${users.sessionVersion} + 1` })
+      .where(and(eq(users.id, id), eq(users.sessionVersion, currentVersion)));
   },
 };

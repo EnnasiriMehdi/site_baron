@@ -12,6 +12,9 @@ export const users = sqliteTable("users", {
   // qu'une fois totpEnabledAt renseigné (code confirmé).
   totpSecret: text("totp_secret"),
   totpEnabledAt: integer("totp_enabled_at", { mode: "timestamp_ms" }),
+  // Numéro de version des sessions : chaque jeton porte la version du moment de sa création ; l'incrémenter
+  // (déconnexion, changement de mot de passe ou de 2FA) invalide d'un coup tous les jetons déjà émis.
+  sessionVersion: integer("session_version").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),
@@ -32,6 +35,26 @@ export const recoveryCodes = sqliteTable("recovery_codes", {
 });
 
 export type RecoveryCode = typeof recoveryCodes.$inferSelect;
+
+// Codes à usage unique envoyés par e-mail pour récupérer le compte admin (mot de passe oublié,
+// téléphone perdu). Un seul code actif par (utilisateur, usage) : en émettre un remplace l'ancien.
+export const emailCodes = sqliteTable("email_codes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  purpose: text("purpose", { enum: ["password_reset", "mfa_reset"] }).notNull(),
+  // Haché comme un mot de passe (argon2) : un accès à la base ne révèle pas de code valide.
+  codeHash: text("code_hash").notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  usedAt: integer("used_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+export type EmailCode = typeof emailCodes.$inferSelect;
 
 export const leads = sqliteTable("leads", {
   id: integer("id").primaryKey({ autoIncrement: true }),
