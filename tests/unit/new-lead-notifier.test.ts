@@ -6,7 +6,7 @@ import {
   createNewLeadNotifier,
 } from "@/features/contact/new-lead-notifier";
 
-const notice = { leadId: 1, attachmentCount: 0 };
+const notice = { leadId: 1, attachmentCount: 0, attachmentBytes: 0 };
 
 function setup(recipients: string[] = ["admin@exemple.test"]) {
   const sendNotification = vi.fn(async () => {});

@@ -9,6 +9,7 @@ import {
   buildNewLeadNotificationEmail,
   type NewLeadNotificationInput,
 } from "./templates/new-lead-notification";
+import { buildStorageWarningEmail, type StorageWarningInput } from "./templates/storage-warning";
 
 // Dépend de l'interface Mailer (DIP) : les tests injectent un double sans toucher au réseau.
 export function createNotificationService(mailer: Mailer) {
@@ -41,6 +42,11 @@ export function createNotificationService(mailer: Mailer) {
 
     async sendNewLeadLimitNotice(recipientEmail: string): Promise<void> {
       const email = buildNewLeadLimitEmail();
+      await mailer.send({ to: recipientEmail, subject: email.subject, html: email.html, text: email.text });
+    },
+
+    async sendStorageWarning(recipientEmail: string, input: StorageWarningInput): Promise<void> {
+      const email = buildStorageWarningEmail(input);
       await mailer.send({ to: recipientEmail, subject: email.subject, html: email.html, text: email.text });
     },
   };

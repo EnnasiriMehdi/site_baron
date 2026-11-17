@@ -5,7 +5,7 @@ import { storeAttachments, type AttachmentToStore } from "@/lib/uploads";
 import type { ContactInput } from "./schema";
 
 // Seules valeurs maîtrisées par le serveur : rien du texte saisi par le visiteur (CLAUDE.md, section 9).
-export type NewLeadNotice = { leadId: number; attachmentCount: number };
+export type NewLeadNotice = { leadId: number; attachmentCount: number; attachmentBytes: number };
 
 /*
  * Dépend d'une interface (LeadRepository) et de fonctions injectables (DIP) :
@@ -23,7 +23,8 @@ export function createContactService(
 
       // La demande est déjà enregistrée : un échec de notification ne doit jamais faire échouer la soumission.
       try {
-        onLeadCreated({ leadId, attachmentCount: attachments.length });
+        const attachmentBytes = attachments.reduce((sum, attachment) => sum + attachment.sizeBytes, 0);
+        onLeadCreated({ leadId, attachmentCount: attachments.length, attachmentBytes });
       } catch (error) {
         console.error(
           `Échec du déclenchement de la notification de nouvelle demande (${error instanceof Error ? error.name : "erreur inconnue"}).`,

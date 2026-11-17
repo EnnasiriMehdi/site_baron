@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { requireAdmin } from "@/features/admin-auth";
-import { drizzleLeadRepository } from "@/features/leads";
+import { drizzleLeadRepository, StorageUsageCard } from "@/features/leads";
+import { getStorageUsage } from "@/lib/uploads";
 
 export const metadata: Metadata = {
   title: "Tableau de bord",
@@ -13,6 +14,7 @@ export default async function AdminDashboardPage() {
   await requireAdmin();
   const leads = await drizzleLeadRepository.list();
   const newCount = leads.filter((lead) => lead.status === "new").length;
+  const storage = await getStorageUsage();
 
   return (
     <section aria-labelledby="dashboard-title">
@@ -31,6 +33,9 @@ export default async function AdminDashboardPage() {
           </p>
         )}
       </Link>
+      <div className="mt-4">
+        <StorageUsageCard usage={storage} />
+      </div>
     </section>
   );
 }

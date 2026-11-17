@@ -13,6 +13,9 @@ export const MAX_TOTAL_BYTES = 8 * 1024 * 1024; // 8 Mo
 // contre le remplissage du disque, quelles que soient les IP utilisées. À ajuster selon le disque du VPS.
 export const MAX_STORAGE_BYTES = 2 * 1024 * 1024 * 1024; // 2 Go
 
+// Part du quota à partir de laquelle l'admin est prévenu (carte du tableau de bord + un e-mail au franchissement).
+export const STORAGE_WARNING_RATIO = 0.8;
+
 // Envois avec pièces jointes acceptés pour TOUT le site sur une fenêtre, quelle que soit l'IP.
 export const GLOBAL_ATTACHMENT_SUBMISSIONS = 30;
 export const GLOBAL_ATTACHMENT_WINDOW_MS = 60 * 60 * 1000; // 1 h
@@ -22,3 +25,6 @@ export const GLOBAL_ATTACHMENT_WINDOW_MS = 60 * 60 * 1000; // 1 h
 // premiers octets du fichier (lib/image-type.ts).
 export const ALLOWED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 Mo (photos publiques gérées par l'admin)
+
+// Résultat de la mesure du stockage (lib/uploads.ts) : type ici pour être utilisable sans importer de module serveur.
+export type StorageUsage = { usedBytes: number; maxBytes: number; percent: number };

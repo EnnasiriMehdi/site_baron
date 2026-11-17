@@ -67,7 +67,7 @@ describe("createContactService.submit", () => {
 
     await service.submit(input, [new File(["x"], "panne.jpg", { type: "image/jpeg" })]);
 
-    expect(onLeadCreated).toHaveBeenCalledWith({ leadId: 42, attachmentCount: 1 });
+    expect(onLeadCreated).toHaveBeenCalledWith({ leadId: 42, attachmentCount: 1, attachmentBytes: 1200 });
   });
 
   it("n'échoue pas si le déclenchement de la notification lève une erreur", async () => {

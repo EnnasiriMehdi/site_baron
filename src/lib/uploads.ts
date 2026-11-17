@@ -5,7 +5,7 @@ import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { detectImageType, EXTENSION_BY_IMAGE_TYPE, readImageType } from "./image-type";
-import { MAX_FILES, MAX_FILE_BYTES, MAX_STORAGE_BYTES, MAX_TOTAL_BYTES } from "./upload-limits";
+import { MAX_FILES, MAX_FILE_BYTES, MAX_STORAGE_BYTES, MAX_TOTAL_BYTES, type StorageUsage } from "./upload-limits";
 
 /*
  * Stockage des pièces jointes du formulaire de contact. Toujours hors `public/` (data/uploads/,
@@ -95,6 +95,18 @@ async function storedBytes(): Promise<number> {
     }),
   );
   return sizes.reduce((sum, size) => sum + size, 0);
+}
+
+
+
+// Même mesure que le quota (le disque réel, pas un compteur) : sert à la carte du tableau de bord et à l'alerte.
+export async function getStorageUsage(): Promise<StorageUsage> {
+  const usedBytes = await storedBytes();
+  return {
+    usedBytes,
+    maxBytes: MAX_STORAGE_BYTES,
+    percent: Math.min(100, Math.floor((usedBytes / MAX_STORAGE_BYTES) * 100)),
+  };
 }
 
 // Quota global : mesure ce qui est réellement sur le disque plutôt qu'un compteur en mémoire, qui
