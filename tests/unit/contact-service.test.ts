@@ -24,7 +24,9 @@ const stored: AttachmentToStore = {
 function fakeRepository(create = vi.fn(async () => 42)): LeadRepository & { create: typeof create } {
   return {
     create,
-    list: vi.fn(async () => []),
+    listPage: vi.fn(async () => ({ leads: [], total: 0 })),
+    counts: vi.fn(async () => ({ total: 0, unread: 0 })),
+    setDone: vi.fn(async () => undefined),
     findById: vi.fn(async () => undefined),
     findAttachmentById: vi.fn(async () => undefined),
     markRead: vi.fn(async () => undefined),
@@ -59,6 +61,39 @@ describe("createContactService.submit", () => {
 
     expect(saveFiles).toHaveBeenCalledWith([file]);
     expect(repository.create).toHaveBeenCalledWith(input, [stored]);
+  });
+
+  it("déclenche la notification avec l'identifiant et le nombre de pièces jointes, rien d'autre", async () => {
+    const onLeadCreated = vi.fn();
+    const service = createContactService(fakeRepository(), vi.fn(async () => [stored]), onLeadCreated);
+
+    await service.submit(input, [new File(["x"], "panne.jpg", { type: "image/jpeg" })]);
+
+    expect(onLeadCreated).toHaveBeenCalledWith({ leadId: 42, attachmentCount: 1, attachmentBytes: 1200 });
+  });
+
+  it("n'échoue pas si le déclenchement de la notification lève une erreur", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const onLeadCreated = vi.fn(() => {
+      throw new Error("hors contexte de requête");
+    });
+    const service = createContactService(fakeRepository(), vi.fn(async () => []), onLeadCreated);
+
+    await expect(service.submit(input, [])).resolves.toBe(42);
+  });
+
+  it("ne notifie pas quand l'enregistrement échoue", async () => {
+    const onLeadCreated = vi.fn();
+    const repository = fakeRepository(
+      vi.fn(async () => {
+        throw new Error("database is locked");
+      }),
+    );
+    const service = createContactService(repository, vi.fn(async () => []), onLeadCreated);
+
+    await expect(service.submit(input, [])).rejects.toThrow();
+
+    expect(onLeadCreated).not.toHaveBeenCalled();
   });
 
   it("propage l'erreur si l'enregistrement échoue (c'est l'action qui répond au visiteur)", async () => {

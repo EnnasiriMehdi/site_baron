@@ -19,3 +19,5 @@ export {
   MFA_VERIFY_PATH,
 } from "./guards";
 export { readPendingMfaChallenge } from "./mfa-session";
+export { drizzleAdminRecipients } from "./user-repository";
+export type { AdminRecipientsReader } from "./user-repository";

@@ -82,3 +82,19 @@ export const drizzleAdminUserRepository: AdminUserRepository = {
       .where(and(eq(users.id, id), eq(users.sessionVersion, currentVersion)));
   },
 };
+
+/*
+ * Destinataires des notifications adressées à l'administration (ex. nouvelle demande). Lus en base à chaque
+ * envoi, jamais copiés dans le .env : si l'admin change d'adresse, la notification suit (CLAUDE.md, section 9 :
+ * l'adresse n'est jamais fournie par un visiteur). Interface séparée (ISP) pour ne pas alourdir AdminUserRepository.
+ */
+export interface AdminRecipientsReader {
+  listAdminEmails(): Promise<string[]>;
+}
+
+export const drizzleAdminRecipients: AdminRecipientsReader = {
+  async listAdminEmails() {
+    const rows = await getDb().select({ email: users.email }).from(users).where(eq(users.role, "admin"));
+    return rows.map((row) => row.email);
+  },
+};
