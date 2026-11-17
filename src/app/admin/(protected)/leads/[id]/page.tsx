@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { requireAdmin } from "@/features/admin-auth";
-import { AttachmentGallery, drizzleLeadRepository } from "@/features/leads";
+import { AttachmentGallery, drizzleLeadRepository, LeadDoneButton } from "@/features/leads";
 
 export const metadata: Metadata = {
   title: "Détail de la demande",
@@ -31,7 +31,13 @@ export default async function AdminLeadDetailPage({ params }: { params: Promise<
       <h1 id="lead-title" className="text-2xl font-bold">
         {lead.name}
       </h1>
-      <p className="mt-1 text-sm text-(--color-text-muted)">Reçue le {dateFormatter.format(lead.createdAt)}</p>
+      <p className="mt-1 text-sm text-(--color-text-muted)">
+        Reçue le {dateFormatter.format(lead.createdAt)}
+        {lead.status === "done" && " · Traitée"}
+      </p>
+      <div className="mt-4">
+        <LeadDoneButton leadId={lead.id} done={lead.status === "done"} />
+      </div>
 
       <dl className="mt-6 grid gap-4 sm:grid-cols-2">
         <div>

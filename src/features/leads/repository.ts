@@ -1,6 +1,6 @@
 import "server-only";
 
-import { desc, eq } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import { leadAttachments, leads, type Lead, type LeadAttachment } from "@/lib/db/schema";
@@ -22,10 +22,14 @@ export type LeadWithAttachments = Lead & { attachments: LeadAttachment[] };
  */
 export interface LeadRepository {
   create(input: NewLeadInput, attachments: AttachmentToStore[]): Promise<number>;
-  list(): Promise<Lead[]>;
+  // Pagination simple : page (à partir de 1) de `pageSize` demandes, les plus récentes d'abord.
+  listPage(page: number, pageSize: number): Promise<{ leads: Lead[]; total: number }>;
+  counts(): Promise<{ total: number; unread: number }>;
   findById(id: number): Promise<LeadWithAttachments | undefined>;
   findAttachmentById(id: number): Promise<LeadAttachment | undefined>;
   markRead(id: number): Promise<void>;
+  // done = traitée ; false rouvre la demande (retour à « lue »).
+  setDone(id: number, done: boolean): Promise<void>;
 }
 
 export const drizzleLeadRepository: LeadRepository = {
@@ -45,8 +49,23 @@ export const drizzleLeadRepository: LeadRepository = {
     return id;
   },
 
-  async list() {
-    return getDb().select().from(leads).orderBy(desc(leads.createdAt));
+  async listPage(page, pageSize) {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(leads)
+      .orderBy(desc(leads.createdAt), desc(leads.id))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+    const [{ total = 0 } = {}] = await db.select({ total: count() }).from(leads);
+    return { leads: rows, total };
+  },
+
+  async counts() {
+    const db = getDb();
+    const [{ total = 0 } = {}] = await db.select({ total: count() }).from(leads);
+    const [{ unread = 0 } = {}] = await db.select({ unread: count() }).from(leads).where(eq(leads.status, "new"));
+    return { total, unread };
   },
 
   async findById(id) {
@@ -63,5 +82,12 @@ export const drizzleLeadRepository: LeadRepository = {
 
   async markRead(id) {
     await getDb().update(leads).set({ status: "read" }).where(eq(leads.id, id));
+  },
+
+  async setDone(id, done) {
+    await getDb()
+      .update(leads)
+      .set({ status: done ? "done" : "read" })
+      .where(eq(leads.id, id));
   },
 };

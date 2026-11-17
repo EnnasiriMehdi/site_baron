@@ -12,8 +12,7 @@ export const metadata: Metadata = {
 
 export default async function AdminDashboardPage() {
   await requireAdmin();
-  const leads = await drizzleLeadRepository.list();
-  const newCount = leads.filter((lead) => lead.status === "new").length;
+  const { total, unread: newCount } = await drizzleLeadRepository.counts();
   const storage = await getStorageUsage();
 
   return (
@@ -26,7 +25,7 @@ export default async function AdminDashboardPage() {
         className="mt-6 flex max-w-sm flex-col gap-1 rounded-(--radius-lg) border border-(--color-border) bg-(--color-surface) p-6 hover:border-(--color-primary)"
       >
         <p className="text-sm font-medium text-(--color-text-muted)">Demandes de contact</p>
-        <p className="text-3xl font-bold">{leads.length}</p>
+        <p className="text-3xl font-bold">{total}</p>
         {newCount > 0 && (
           <p className="text-sm font-semibold text-(--color-accent)">
             {newCount} nouvelle{newCount > 1 ? "s" : ""}

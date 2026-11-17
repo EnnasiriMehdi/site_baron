@@ -63,7 +63,9 @@ export const leads = sqliteTable("leads", {
   email: text("email").notNull(),
   subject: text("subject").notNull(),
   message: text("message").notNull(),
-  status: text("status", { enum: ["new", "read"] }).notNull().default("new"),
+  // new = jamais ouverte, read = ouverte par l'admin, done = traitée (marquée à la main). Colonne texte sans
+  // contrainte SQL : ajouter "done" ne demande aucune migration.
+  status: text("status", { enum: ["new", "read", "done"] }).notNull().default("new"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

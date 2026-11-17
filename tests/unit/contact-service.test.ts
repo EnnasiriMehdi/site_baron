@@ -24,7 +24,9 @@ const stored: AttachmentToStore = {
 function fakeRepository(create = vi.fn(async () => 42)): LeadRepository & { create: typeof create } {
   return {
     create,
-    list: vi.fn(async () => []),
+    listPage: vi.fn(async () => ({ leads: [], total: 0 })),
+    counts: vi.fn(async () => ({ total: 0, unread: 0 })),
+    setDone: vi.fn(async () => undefined),
     findById: vi.fn(async () => undefined),
     findAttachmentById: vi.fn(async () => undefined),
     markRead: vi.fn(async () => undefined),
