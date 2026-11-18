@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 
 import { siteConfig } from "@/config/site";
+import { useToast } from "@/components/ui/toast/toast";
 import type { Article } from "@/lib/db/schema";
 
 import { updateArticleAction, type ArticleFormState } from "../actions";
@@ -16,6 +17,14 @@ type EditArticleFormProps = {
 
 export function EditArticleForm({ article }: EditArticleFormProps) {
   const [state, action, pending] = useActionState(updateArticleAction, initialState);
+  const toast = useToast();
+
+  // Avant, un enregistrement réussi ne donnait aucun retour visuel.
+  useEffect(() => {
+    if (!state) return;
+    if ("error" in state) toast.error(state.error);
+    else toast.success("Article enregistré.");
+  }, [state, toast]);
   const slugLocked = article.status === "published";
 
   return (
@@ -130,10 +139,6 @@ export function EditArticleForm({ article }: EditArticleFormProps) {
         <div className="mt-1">
           <ArticleEditor name="body" defaultValue={article.body} />
         </div>
-      </div>
-
-      <div role="alert" aria-live="assertive" className="min-h-6">
-        {state && "error" in state && <p className="text-sm text-(--color-danger)">{state.error}</p>}
       </div>
 
       <button

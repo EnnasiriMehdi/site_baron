@@ -1,8 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect } from "react";
 
 import { siteConfig } from "@/config/site";
+import { useToast } from "@/components/ui/toast/toast";
 
 import { createRealisationAction, type RealisationFormState } from "../actions";
 
@@ -10,6 +12,18 @@ const initialState: RealisationFormState = null;
 
 export function RealisationForm() {
   const [state, action, pending] = useActionState(createRealisationAction, initialState);
+  const toast = useToast();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!state) return;
+    if ("error" in state) {
+      toast.error(state.error);
+      return;
+    }
+    toast.success("Réalisation ajoutée.");
+    router.push("/admin/realisations");
+  }, [state, toast, router]);
 
   return (
     <form action={action} className="flex max-w-xl flex-col gap-4">
@@ -124,10 +138,6 @@ export function RealisationForm() {
           ))}
         </div>
       </fieldset>
-
-      <div role="alert" aria-live="assertive" className="min-h-6">
-        {state && "error" in state && <p className="text-sm text-(--color-danger)">{state.error}</p>}
-      </div>
 
       <button
         type="submit"

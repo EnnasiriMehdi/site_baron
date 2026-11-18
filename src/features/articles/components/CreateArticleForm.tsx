@@ -1,8 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect } from "react";
 
 import { siteConfig } from "@/config/site";
+import { useToast } from "@/components/ui/toast/toast";
 
 import { createArticleAction, type ArticleFormState } from "../actions";
 import { ArticleEditor } from "./ArticleEditor";
@@ -11,6 +13,19 @@ const initialState: ArticleFormState = null;
 
 export function CreateArticleForm() {
   const [state, action, pending] = useActionState(createArticleAction, initialState);
+  const toast = useToast();
+  const router = useRouter();
+
+  // Le toast reste affiché après la navigation : le fournisseur est dans app/admin/layout.tsx, qui ne se remonte pas.
+  useEffect(() => {
+    if (!state) return;
+    if ("error" in state) {
+      toast.error(state.error);
+      return;
+    }
+    toast.success("Article créé. Vous pouvez maintenant le compléter.");
+    router.push(`/admin/articles/${state.id}/edit`);
+  }, [state, toast, router]);
 
   return (
     <form action={action} className="flex max-w-2xl flex-col gap-4">
@@ -96,10 +111,6 @@ export function CreateArticleForm() {
         <div className="mt-1">
           <ArticleEditor name="body" defaultValue="" />
         </div>
-      </div>
-
-      <div role="alert" aria-live="assertive" className="min-h-6">
-        {state && "error" in state && <p className="text-sm text-(--color-danger)">{state.error}</p>}
       </div>
 
       <button

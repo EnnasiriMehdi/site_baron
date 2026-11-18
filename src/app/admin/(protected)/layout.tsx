@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { logoutAction, requireAdminSession } from "@/features/admin-auth";
+import { LogoutButton, requireAdminSession } from "@/features/admin-auth";
 
 export default async function ProtectedAdminLayout({ children }: { children: React.ReactNode }) {
   // Vérification côté serveur à chaque rendu : ne jamais se fier au seul proxy.
@@ -31,14 +31,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
               </>
             )}
           </nav>
-          <form action={logoutAction}>
-            <button
-              type="submit"
-              className="min-h-11 rounded-(--radius-md) border border-(--color-border) px-4 py-2 font-medium"
-            >
-              Se déconnecter
-            </button>
-          </form>
+          <LogoutButton />
         </div>
       </header>
       <main id="contenu" className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">

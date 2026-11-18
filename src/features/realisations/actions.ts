@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
 import { requireAdmin } from "@/features/admin-auth";
 import { storePublicImage, validatePublicImage } from "@/lib/public-image-upload";
@@ -9,7 +8,7 @@ import { storePublicImage, validatePublicImage } from "@/lib/public-image-upload
 import { drizzleRealisationRepository } from "./repository";
 import { realisationSchema } from "./schema";
 
-export type RealisationFormState = { error: string } | null;
+export type RealisationFormState = { error: string } | { ok: true } | null;
 
 export async function createRealisationAction(
   _previous: RealisationFormState,
@@ -77,7 +76,7 @@ export async function createRealisationAction(
   revalidatePath("/realisations");
   revalidatePath("/admin/realisations");
 
-  redirect("/admin/realisations");
+  return { ok: true };
 }
 
 export async function deleteRealisationAction(id: number): Promise<void> {
