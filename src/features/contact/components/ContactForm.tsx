@@ -3,10 +3,10 @@
 import { useActionState, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { FileInput, Field, Form, Input, SubmitButton, Textarea, type FieldErrors } from "@/components/ui/form";
+import { compressImage } from "@/lib/image-compression";
 import { ALLOWED_IMAGE_MIME_TYPES, MAX_FILES, MAX_FILE_BYTES } from "@/lib/upload-limits";
 
 import { issueFormTokenAction, submitContactAction, type ContactFormState } from "../actions";
-import { compressImage } from "../image-compression";
 import { ContactSuccess } from "./ContactSuccess";
 
 const initialState: ContactFormState = null;

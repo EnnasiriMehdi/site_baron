@@ -28,8 +28,10 @@
   --color-border: #dce6ef;
 
   /* Typographie */
-  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  /* Polices déclarées dans styles/fonts/index.ts. Sans police configurée : `serif`, volontairement visible. */
+  --font-sans: var(--font-body, serif);
+  /* Chasse fixe du système (codes de secours, clé 2FA, extraits de code) : aucune police à télécharger. */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* Formes */
   --radius-md: 0.5rem;

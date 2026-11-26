@@ -6,6 +6,7 @@ import { useActionState, useEffect } from "react";
 import { siteConfig } from "@/config/site";
 import { FileInput, Field, Form, Input, Select, SubmitButton, Textarea } from "@/components/ui/form";
 import { useToast } from "@/components/ui/toast/toast";
+import { PUBLIC_IMAGE_MAX_SIDE } from "@/lib/image-compression";
 
 import { createRealisationAction, type RealisationFormState } from "../actions";
 
@@ -57,7 +58,7 @@ export function RealisationForm() {
       </Field>
 
       <Field name="photo" label="Photo (JPG, PNG ou WEBP, 5 Mo maximum)">
-        <FileInput accept="image/jpeg,image/png,image/webp" required />
+        <FileInput accept="image/jpeg,image/png,image/webp" optimizeImages={PUBLIC_IMAGE_MAX_SIDE} required />
       </Field>
 
       <Field name="photoAlt" label="Texte alternatif de la photo">
@@ -77,7 +78,7 @@ export function RealisationForm() {
           {[2, 3, 4, 5].map((slot) => (
             <div key={slot} className="grid gap-2 sm:grid-cols-2">
               <Field name={`photo${slot}`} label={`Photo ${slot}`}>
-                <FileInput accept="image/jpeg,image/png,image/webp" />
+                <FileInput accept="image/jpeg,image/png,image/webp" optimizeImages={PUBLIC_IMAGE_MAX_SIDE} />
               </Field>
               <Field name={`photo${slot}Alt`} label="Texte alternatif">
                 <Input type="text" maxLength={160} />

@@ -10,8 +10,11 @@ export const metadata: Metadata = {
 // Le fournisseur de toasts est ici (connexion ET zone protégée) : il reste monté quand on passe de l'une à l'autre.
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ToastProvider>
-      <div className="flex min-h-screen flex-col">{children}</div>
-    </ToastProvider>
+    // `admin-area` entoure aussi le fournisseur de toasts : les notifications prennent la police de l'admin.
+    <div className="admin-area">
+      <ToastProvider>
+        <div className="flex min-h-screen flex-col">{children}</div>
+      </ToastProvider>
+    </div>
   );
 }

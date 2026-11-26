@@ -14,7 +14,25 @@ html {
 body {
   background: var(--color-surface);
   color: var(--color-text);
-  font-family: var(--font-sans);
+  font-family: var(--font-body, serif);
+}
+
+/*
+ * Les trois rôles de police (déclarés dans styles/fonts/index.ts). `serif` = aucune police configurée pour ce rôle.
+ * `.admin-area` est posée une seule fois, dans app/admin/layout.tsx.
+ */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading, serif);
+}
+
+.admin-area,
+.admin-area :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--font-admin, serif);
 }
 
 :focus-visible {

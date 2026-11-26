@@ -185,13 +185,32 @@ describe("selectFilesWithinQuota (quota global)", () => {
 });
 
 describe("validatePublicImage / storePublicImage", () => {
+  // Les images publiques sont relues en entier (retrait des métadonnées) : il faut un JPEG complet.
+  const SCAN_AND_END = [0xff, 0xda, 0x00, 0x02, 0x01, 0xff, 0xd9];
+  const FULL_JPEG = [0xff, 0xd8, ...SCAN_AND_END];
+
   it("valide une vraie image et refuse un faux fichier", async () => {
-    expect((await validatePublicImage(file(JPEG, "a.jpg", "image/jpeg"))).ok).toBe(true);
+    expect((await validatePublicImage(file(FULL_JPEG, "a.jpg", "image/jpeg"))).ok).toBe(true);
     expect((await validatePublicImage(file(text("MZ"), "a.jpg", "image/jpeg"))).ok).toBe(false);
   });
 
+  it("refuse une image dont la structure est illisible", async () => {
+    const result = await validatePublicImage(file(JPEG, "tronquee.jpg", "image/jpeg"));
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("illisible");
+  });
+
+  it("écrit l'image sans ses métadonnées", async () => {
+    const exif = [0xff, 0xe1, 0x00, 0x06, 0x47, 0x50, 0x53, 0x21];
+
+    await storePublicImage(file([0xff, 0xd8, ...exif, ...SCAN_AND_END], "chantier.jpg", "image/jpeg"), "realisations");
+
+    expect([...(fsMocks.writeFile.mock.calls[0]?.[1] as Uint8Array)]).toEqual(FULL_JPEG);
+  });
+
   it("garde le nom réel, avec l'extension déduite du contenu", async () => {
-    const url = await storePublicImage(file(JPEG, "Chaudière murale.png", "image/png"), "realisations");
+    const url = await storePublicImage(file(FULL_JPEG, "Chaudière murale.png", "image/png"), "realisations");
 
     expect(url).toBe("/uploads/realisations/Chaudiere_murale.jpg");
   });
@@ -201,7 +220,7 @@ describe("validatePublicImage / storePublicImage", () => {
       .mockRejectedValueOnce(Object.assign(new Error("exists"), { code: "EEXIST" }))
       .mockResolvedValueOnce(undefined);
 
-    const url = await storePublicImage(file(JPEG, "photo.jpg", "image/jpeg"), "realisations");
+    const url = await storePublicImage(file(FULL_JPEG, "photo.jpg", "image/jpeg"), "realisations");
 
     expect(url).toBe("/uploads/realisations/photo-2.jpg");
   });

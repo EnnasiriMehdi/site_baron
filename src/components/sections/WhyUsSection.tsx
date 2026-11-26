@@ -20,7 +20,8 @@ export function WhyUsSection() {
             src="/images/technicien-chaudiere-moderne.png"
             alt={`Technicien ${siteConfig.name} au travail sur une chaudière`}
             fill
-            sizes="100vw"
+            // Bornée par max-w-6xl (1152 px) moins 2 × 16 px de marge intérieure.
+            sizes="(min-width: 1152px) 1120px, 100vw"
             className="object-cover"
           />
         </div>
