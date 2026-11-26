@@ -3,6 +3,7 @@
 import { useActionState, useEffect } from "react";
 
 import { siteConfig } from "@/config/site";
+import { FileInput, Field, Form, Input, Select, SubmitButton, Textarea } from "@/components/ui/form";
 import { useToast } from "@/components/ui/toast/toast";
 import type { Article } from "@/lib/db/schema";
 
@@ -16,7 +17,7 @@ type EditArticleFormProps = {
 };
 
 export function EditArticleForm({ article }: EditArticleFormProps) {
-  const [state, action, pending] = useActionState(updateArticleAction, initialState);
+  const [state, action] = useActionState(updateArticleAction, initialState);
   const toast = useToast();
 
   // Avant, un enregistrement réussi ne donnait aucun retour visuel.
@@ -28,126 +29,73 @@ export function EditArticleForm({ article }: EditArticleFormProps) {
   const slugLocked = article.status === "published";
 
   return (
-    <form action={action} className="flex max-w-2xl flex-col gap-4">
+    <Form
+      action={action}
+      className="max-w-2xl"
+      actions={
+        <SubmitButton pendingLabel="Enregistrement…" className="self-start">
+          Enregistrer
+        </SubmitButton>
+      }
+    >
       <input type="hidden" name="id" value={article.id} />
 
-      <div>
-        <label htmlFor="title" className="block text-sm font-medium">
-          Titre (60 caractères max)
-        </label>
-        <input
-          id="title"
-          name="title"
-          type="text"
-          required
-          maxLength={60}
-          defaultValue={article.title}
-          className="mt-1 w-full rounded-(--radius-md) border border-(--color-border) bg-(--color-surface) px-3 py-2"
-        />
-      </div>
+      <Field name="title" label="Titre (60 caractères max)">
+        <Input type="text" required maxLength={60} defaultValue={article.title} />
+      </Field>
 
-      <div>
-        <label htmlFor="slug" className="block text-sm font-medium">
-          Slug {slugLocked && "(figé : l'article est déjà publié)"}
-        </label>
-        <input
-          id="slug"
-          name="slug"
+      <Field name="slug" label={slugLocked ? "Slug (figé : l'article est déjà publié)" : "Slug"}>
+        <Input
           type="text"
           required
           disabled={slugLocked}
           pattern="[a-z0-9-]+"
           defaultValue={article.slug}
-          className="mt-1 w-full rounded-(--radius-md) border border-(--color-border) bg-(--color-surface) px-3 py-2 disabled:opacity-60"
+          className="disabled:opacity-60"
         />
-      </div>
+      </Field>
 
-      <div>
-        <label htmlFor="description" className="block text-sm font-medium">
-          Description (155 caractères max)
-        </label>
-        <textarea
-          id="description"
-          name="description"
-          required
-          maxLength={155}
-          rows={2}
-          defaultValue={article.description}
-          className="mt-1 w-full rounded-(--radius-md) border border-(--color-border) bg-(--color-surface) px-3 py-2"
-        />
-      </div>
+      <Field name="description" label="Description (155 caractères max)">
+        <Textarea required maxLength={155} rows={2} defaultValue={article.description} />
+      </Field>
 
-      <div>
-        <label htmlFor="authorName" className="block text-sm font-medium">
-          Auteur
-        </label>
-        <input
-          id="authorName"
-          name="authorName"
-          type="text"
-          required
-          defaultValue={article.authorName}
-          className="mt-1 w-full rounded-(--radius-md) border border-(--color-border) bg-(--color-surface) px-3 py-2"
-        />
-      </div>
+      <Field name="authorName" label="Auteur">
+        <Input type="text" required defaultValue={article.authorName} />
+      </Field>
 
-      <div>
-        <label htmlFor="relatedServiceSlug" className="block text-sm font-medium">
-          Service lié (facultatif)
-        </label>
-        <select
-          id="relatedServiceSlug"
-          name="relatedServiceSlug"
-          defaultValue={article.relatedServiceSlug ?? ""}
-          className="mt-1 w-full rounded-(--radius-md) border border-(--color-border) bg-(--color-surface) px-3 py-2"
-        >
+      <Field name="relatedServiceSlug" label="Service lié (facultatif)">
+        <Select defaultValue={article.relatedServiceSlug ?? ""}>
           <option value="">Aucun</option>
           {siteConfig.services.map((service) => (
             <option key={service.slug} value={service.slug}>
               {service.title}
             </option>
           ))}
-        </select>
-      </div>
+        </Select>
+      </Field>
 
-      <div>
-        <label htmlFor="coverImage" className="block text-sm font-medium">
-          Photo de couverture (JPG, PNG ou WEBP, 5 Mo maximum)
-          {article.coverImagePath && " — remplace la photo actuelle si vous en choisissez une nouvelle"}
-        </label>
-        <input id="coverImage" name="coverImage" type="file" accept="image/jpeg,image/png,image/webp" className="mt-1 w-full text-sm" />
-      </div>
+      <Field
+        name="coverImage"
+        label={`Photo de couverture (JPG, PNG ou WEBP, 5 Mo maximum)${
+          article.coverImagePath ? " — remplace la photo actuelle si vous en choisissez une nouvelle" : ""
+        }`}
+      >
+        <FileInput accept="image/jpeg,image/png,image/webp" />
+      </Field>
 
-      <div>
-        <label htmlFor="coverImageAlt" className="block text-sm font-medium">
-          Texte alternatif de la couverture {!article.coverImagePath && "(obligatoire avant publication)"}
-        </label>
-        <input
-          id="coverImageAlt"
-          name="coverImageAlt"
-          type="text"
-          maxLength={160}
-          defaultValue={article.coverImageAlt ?? ""}
-          className="mt-1 w-full rounded-(--radius-md) border border-(--color-border) bg-(--color-surface) px-3 py-2"
-        />
-      </div>
+      <Field
+        name="coverImageAlt"
+        label={`Texte alternatif de la couverture${article.coverImagePath ? "" : " (obligatoire avant publication)"}`}
+      >
+        <Input type="text" maxLength={160} defaultValue={article.coverImageAlt ?? ""} />
+      </Field>
 
-      <div>
-        <label htmlFor="body" className="block text-sm font-medium">
-          Contenu
-        </label>
+      {/* L'éditeur gère lui-même son champ caché « body » : le Field ne fournit ici que le label. */}
+      <Field name="body" label="Contenu">
         <div className="mt-1">
           <ArticleEditor name="body" defaultValue={article.body} />
         </div>
-      </div>
-
-      <button
-        type="submit"
-        disabled={pending}
-        className="min-h-11 self-start rounded-(--radius-md) bg-(--color-primary) px-5 py-3 font-semibold text-(--color-primary-contrast) disabled:opacity-60"
-      >
-        {pending ? "Enregistrement…" : "Enregistrer"}
-      </button>
-    </form>
+      </Field>
+    </Form>
   );
 }
