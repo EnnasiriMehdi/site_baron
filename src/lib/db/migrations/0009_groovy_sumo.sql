@@ -1,0 +1,1 @@
+ALTER TABLE `leads` ADD `dropped_attachment_count` integer DEFAULT 0 NOT NULL;

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { detectImageType, EXTENSION_BY_IMAGE_TYPE, readImageType } from "./image-type";
@@ -50,30 +50,56 @@ export async function validateAttachments(files: File[]): Promise<AttachmentVali
   return { ok: true, files };
 }
 
+// Cause technique seulement (code système ou nom de l'erreur) : jamais le message, qui peut contenir un chemin
+// ou un nom de fichier du visiteur (CLAUDE.md, section 8.4).
+function logStorageFailure(error: unknown): void {
+  const code = (error as NodeJS.ErrnoException | null)?.code;
+  const cause = code ?? (error instanceof Error ? error.name : "erreur inconnue");
+  console.error(`Échec de l'enregistrement d'une pièce jointe (${cause}).`);
+}
+
+async function storeOne(file: File): Promise<AttachmentToStore> {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const mimeType = detectImageType(buffer);
+  if (!mimeType) throw new Error("Type de fichier non reconnu.");
+
+  const filename = `${Date.now()}-${randomUUID()}.${EXTENSION_BY_IMAGE_TYPE[mimeType]}`;
+  const target = path.join(UPLOADS_DIR, filename);
+  try {
+    await writeFile(target, buffer);
+  } catch (error) {
+    // Disque plein : un fichier à moitié écrit peut rester et consommer le quota. Retiré, sans masquer la cause.
+    await unlink(target).catch(() => undefined);
+    throw error;
+  }
+
+  return { originalName: file.name, storedPath: filename, mimeType, sizeBytes: file.size };
+}
+
 /*
  * Écrit les fichiers sur disque avec un nom généré (jamais le nom fourni par le visiteur, pour éviter
  * toute tentative de traversée de chemin) et renvoie les métadonnées à insérer en base. Le type et
  * l'extension viennent de la détection par les octets, refaite ici sur le contenu complet : ce module
  * ne fait jamais confiance à `file.type`, même si l'appelant a déjà validé.
+ *
+ * Ne lève jamais d'erreur : chaque fichier est traité séparément et seuls les réussis sont renvoyés. Une demande
+ * n'est jamais perdue à cause d'un fichier ; l'appelant compte les manquants.
  */
 export async function storeAttachments(files: File[]): Promise<AttachmentToStore[]> {
-  await mkdir(UPLOADS_DIR, { recursive: true });
+  try {
+    await mkdir(UPLOADS_DIR, { recursive: true });
+  } catch (error) {
+    logStorageFailure(error);
+    return [];
+  }
 
   const stored: AttachmentToStore[] = [];
   for (const file of files) {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const mimeType = detectImageType(buffer);
-    if (!mimeType) throw new Error("Type de fichier non reconnu.");
-
-    const filename = `${Date.now()}-${randomUUID()}.${EXTENSION_BY_IMAGE_TYPE[mimeType]}`;
-    await writeFile(path.join(UPLOADS_DIR, filename), buffer);
-
-    stored.push({
-      originalName: file.name,
-      storedPath: filename,
-      mimeType,
-      sizeBytes: file.size,
-    });
+    try {
+      stored.push(await storeOne(file));
+    } catch (error) {
+      logStorageFailure(error);
+    }
   }
   return stored;
 }
@@ -110,9 +136,15 @@ export async function getStorageUsage(): Promise<StorageUsage> {
 }
 
 // Quota global : mesure ce qui est réellement sur le disque plutôt qu'un compteur en mémoire, qui
-// serait remis à zéro à chaque redémarrage.
-export async function storageHasRoomFor(incomingBytes: number): Promise<boolean> {
-  return (await storedBytes()) + incomingBytes <= MAX_STORAGE_BYTES;
+// serait remis à zéro à chaque redémarrage. Renvoie les fichiers qui tiennent, dans l'ordre d'envoi : un fichier
+// trop gros pour la place restante n'empêche pas de garder un plus petit qui suit.
+export async function selectFilesWithinQuota(files: File[]): Promise<File[]> {
+  let used = await storedBytes();
+  return files.filter((file) => {
+    if (used + file.size > MAX_STORAGE_BYTES) return false;
+    used += file.size;
+    return true;
+  });
 }
 
 export function resolveUploadPath(storedPath: string): string {

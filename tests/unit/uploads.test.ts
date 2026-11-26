@@ -6,12 +6,13 @@ const fsMocks = vi.hoisted(() => ({
   mkdir: vi.fn(),
   readdir: vi.fn(),
   stat: vi.fn(),
+  unlink: vi.fn(),
 }));
 vi.mock("node:fs/promises", () => fsMocks);
 
 import { storePublicImage, validatePublicImage } from "@/lib/public-image-upload";
 import { MAX_FILES, MAX_FILE_BYTES, MAX_STORAGE_BYTES, MAX_TOTAL_BYTES } from "@/lib/upload-limits";
-import { storageHasRoomFor, storeAttachments, validateAttachments } from "@/lib/uploads";
+import { selectFilesWithinQuota, storeAttachments, validateAttachments } from "@/lib/uploads";
 
 const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d];
 const JPEG = [0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46];
@@ -26,6 +27,7 @@ beforeEach(() => {
   fsMocks.mkdir.mockReset().mockResolvedValue(undefined);
   fsMocks.readdir.mockReset().mockResolvedValue([]);
   fsMocks.stat.mockReset().mockResolvedValue({ size: 0 });
+  fsMocks.unlink.mockReset().mockResolvedValue(undefined);
 });
 
 describe("validateAttachments", () => {
@@ -93,31 +95,92 @@ describe("storeAttachments", () => {
     expect(fsMocks.writeFile).toHaveBeenCalledTimes(1);
   });
 
-  it("refuse d'écrire un contenu qui n'est pas une image", async () => {
-    await expect(storeAttachments([file(text("<html>"), "x.png", "image/png")])).rejects.toThrow();
+  it("n'écrit pas un contenu qui n'est pas une image", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await storeAttachments([file(text("<html>"), "x.png", "image/png")])).toEqual([]);
     expect(fsMocks.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("garde les fichiers réussis quand une écriture échoue, et retire le fichier à moitié écrit", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    fsMocks.writeFile
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(Object.assign(new Error("disque plein"), { code: "ENOSPC" }))
+      .mockResolvedValueOnce(undefined);
+
+    const result = await storeAttachments([
+      file(PNG, "1.png", "image/png"),
+      file(PNG, "2.png", "image/png"),
+      file(JPEG, "3.jpg", "image/jpeg"),
+    ]);
+
+    expect(result.map((a) => a.originalName)).toEqual(["1.png", "3.jpg"]);
+    // Seul le fichier en échec est retiré : exactement le chemin qui venait d'être écrit.
+    expect(fsMocks.unlink).toHaveBeenCalledTimes(1);
+    expect(fsMocks.unlink).toHaveBeenCalledWith(fsMocks.writeFile.mock.calls[1]?.[0]);
+  });
+
+  it("continue même si le retrait du fichier à moitié écrit échoue aussi", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    fsMocks.writeFile.mockRejectedValueOnce(new Error("disque plein"));
+    fsMocks.unlink.mockRejectedValue(new Error("absent"));
+
+    const result = await storeAttachments([file(PNG, "1.png", "image/png"), file(PNG, "2.png", "image/png")]);
+
+    expect(result.map((a) => a.originalName)).toEqual(["2.png"]);
+  });
+
+  it("ne lève pas d'erreur si le dossier ne peut pas être créé : aucun fichier enregistré", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    fsMocks.mkdir.mockRejectedValue(new Error("lecture seule"));
+
+    expect(await storeAttachments([file(PNG, "1.png", "image/png")])).toEqual([]);
+    expect(fsMocks.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("ne journalise jamais le nom du fichier du visiteur", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    fsMocks.writeFile.mockRejectedValue(new Error("échec sur marie-dupont.png"));
+
+    await storeAttachments([file(PNG, "marie-dupont.png", "image/png")]);
+
+    expect(consoleError).toHaveBeenCalled();
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain("marie-dupont");
   });
 });
 
-describe("storageHasRoomFor (quota global)", () => {
-  it("accepte tant que le total stocké + l'envoi tient dans le plafond", async () => {
+describe("selectFilesWithinQuota (quota global)", () => {
+  const sized = (name: string, size: number) => ({ name, size }) as File;
+  const names = (files: File[]) => files.map((f) => f.name);
+
+  it("garde tout tant que le total stocké + l'envoi tient dans le plafond", async () => {
     fsMocks.readdir.mockResolvedValue(["a.jpg", "b.jpg"]);
     fsMocks.stat.mockResolvedValue({ size: 1000 });
 
-    expect(await storageHasRoomFor(1000)).toBe(true);
+    expect(names(await selectFilesWithinQuota([sized("1", 500), sized("2", 500)]))).toEqual(["1", "2"]);
   });
 
-  it("refuse dès que le plafond serait dépassé", async () => {
-    fsMocks.readdir.mockResolvedValue(["a.jpg", "b.jpg"]);
-    fsMocks.stat.mockResolvedValue({ size: MAX_STORAGE_BYTES / 2 });
+  it("garde, dans l'ordre d'envoi, les seuls fichiers qui tiennent", async () => {
+    fsMocks.readdir.mockResolvedValue(["a.jpg"]);
+    fsMocks.stat.mockResolvedValue({ size: MAX_STORAGE_BYTES - 1000 });
 
-    expect(await storageHasRoomFor(1)).toBe(false);
+    const kept = await selectFilesWithinQuota([sized("1", 600), sized("trop gros", 600), sized("3", 400)]);
+
+    expect(names(kept)).toEqual(["1", "3"]);
+  });
+
+  it("ne garde rien quand le quota est atteint", async () => {
+    fsMocks.readdir.mockResolvedValue(["a.jpg"]);
+    fsMocks.stat.mockResolvedValue({ size: MAX_STORAGE_BYTES });
+
+    expect(await selectFilesWithinQuota([sized("1", 1)])).toEqual([]);
   });
 
   it("considère le dossier vide s'il n'existe pas encore", async () => {
     fsMocks.readdir.mockRejectedValue(Object.assign(new Error("absent"), { code: "ENOENT" }));
 
-    expect(await storageHasRoomFor(1024)).toBe(true);
+    expect(await selectFilesWithinQuota([sized("1", 1024)])).toHaveLength(1);
   });
 });
 

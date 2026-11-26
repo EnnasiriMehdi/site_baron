@@ -66,6 +66,9 @@ export const leads = sqliteTable("leads", {
   // new = jamais ouverte, read = ouverte par l'admin, done = traitée (marquée à la main). Colonne texte sans
   // contrainte SQL : ajouter "done" ne demande aucune migration.
   status: text("status", { enum: ["new", "read", "done"] }).notNull().default("new"),
+  // Pièces jointes envoyées par le visiteur mais non enregistrées (plafond, quota, échec d'écriture) : affiché à
+  // l'admin pour qu'il les réclame lors de la prise de contact.
+  droppedAttachmentCount: integer("dropped_attachment_count").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

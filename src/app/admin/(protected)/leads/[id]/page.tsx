@@ -68,6 +68,15 @@ export default async function AdminLeadDetailPage({ params }: { params: Promise<
         <p className="mt-1 whitespace-pre-wrap">{lead.message}</p>
       </div>
 
+      {lead.droppedAttachmentCount > 0 && (
+        <p className="mt-6 rounded-(--radius-md) border-2 border-(--color-warning) bg-(--color-surface) p-4">
+          <strong>Attention :</strong>{" "}
+          {lead.droppedAttachmentCount === 1
+            ? "1 fichier envoyé par le visiteur n'a pas été enregistré. Demandez-le lors de la prise de contact."
+            : `${lead.droppedAttachmentCount} fichiers envoyés par le visiteur n'ont pas été enregistrés. Demandez-les lors de la prise de contact.`}
+        </p>
+      )}
+
       {lead.attachments.length > 0 && (
         <div className="mt-6">
           <h2 className="text-sm font-medium text-(--color-text-muted)">Pièces jointes</h2>

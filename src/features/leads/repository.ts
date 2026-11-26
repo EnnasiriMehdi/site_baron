@@ -21,7 +21,8 @@ export type LeadWithAttachments = Lead & { attachments: LeadAttachment[] };
  * Les deux passent par cette même interface (DIP), jamais par Drizzle directement.
  */
 export interface LeadRepository {
-  create(input: NewLeadInput, attachments: AttachmentToStore[]): Promise<number>;
+  // droppedAttachmentCount : fichiers envoyés par le visiteur mais non enregistrés.
+  create(input: NewLeadInput, attachments: AttachmentToStore[], droppedAttachmentCount?: number): Promise<number>;
   // Pagination simple : page (à partir de 1) de `pageSize` demandes, les plus récentes d'abord.
   listPage(page: number, pageSize: number): Promise<{ leads: Lead[]; total: number }>;
   counts(): Promise<{ total: number; unread: number }>;
@@ -33,11 +34,14 @@ export interface LeadRepository {
 }
 
 export const drizzleLeadRepository: LeadRepository = {
-  async create(input, attachments) {
+  async create(input, attachments, droppedAttachmentCount = 0) {
     const db = getDb();
     // Transaction : si l'insertion des pièces jointes échoue, la demande elle-même n'est pas créée à moitié.
     const id = db.transaction((tx) => {
-      const result = tx.insert(leads).values(input).run();
+      const result = tx
+        .insert(leads)
+        .values({ ...input, droppedAttachmentCount })
+        .run();
       const leadId = Number(result.lastInsertRowid);
       if (attachments.length > 0) {
         tx.insert(leadAttachments)
