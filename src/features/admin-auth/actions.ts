@@ -62,15 +62,21 @@ export async function loginAction(_previous: LoginFormState, formData: FormData)
  * copie volée du cookie (sinon elle resterait valable jusqu'à 2 h). Contrepartie assumée : se
  * déconnecter d'un appareil déconnecte tous les autres.
  */
-export async function logoutAction(): Promise<void> {
+// `partial` = cet appareil est déconnecté mais les AUTRES sessions n'ont pas pu être révoquées (le bouton de
+// déconnexion le signale par un toast, puis navigue vers `redirectTo`).
+export type LogoutResult = { partial: boolean; redirectTo: string };
+
+export async function logoutAction(): Promise<LogoutResult> {
   const session = await readSession();
   // D'abord la déconnexion locale : elle doit réussir même si la révocation échoue.
   await destroySession();
 
+  let partial = false;
   if (session) {
     try {
       await drizzleAdminUserRepository.revokeSessions(session.userId, session.sessionVersion);
     } catch (error) {
+      partial = true;
       // Jamais d'échec silencieux (CLAUDE.md, section 9) : le nom de l'erreur seulement. Dans ce cas,
       // les autres sessions restent valables jusqu'à leur expiration (2 h).
       console.error(
@@ -79,6 +85,6 @@ export async function logoutAction(): Promise<void> {
     }
   }
 
-  // Hors du try/catch : redirect() lève une exception interne.
-  redirect(LOGIN_PATH);
+  // Pas de redirect() ici : il effacerait le résultat avant que le client puisse afficher le toast.
+  return { partial, redirectTo: LOGIN_PATH };
 }

@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useActionState, useState } from "react";
 
+import { Field, Form, Input, SubmitButton } from "@/components/ui/form";
+
 import {
   confirmTotpEnrollmentAction,
   startTotpEnrollmentAction,
@@ -14,14 +16,8 @@ const initialStartState: EnrollmentStartState = null;
 const initialConfirmState: EnrollmentConfirmState = null;
 
 export function TotpEnrollment() {
-  const [startState, startAction, startPending] = useActionState(
-    async () => startTotpEnrollmentAction(),
-    initialStartState,
-  );
-  const [confirmState, confirmAction, confirmPending] = useActionState(
-    confirmTotpEnrollmentAction,
-    initialConfirmState,
-  );
+  const [startState, startAction] = useActionState(async () => startTotpEnrollmentAction(), initialStartState);
+  const [confirmState, confirmAction] = useActionState(confirmTotpEnrollmentAction, initialConfirmState);
   const [acknowledged, setAcknowledged] = useState(false);
 
   // Étape 3 : les codes de secours ne sont affichés qu'une seule fois, juste après l'activation.
@@ -76,57 +72,44 @@ export function TotpEnrollment() {
         <p className="text-sm text-(--color-text-muted)">
           Impossible de scanner ? Saisissez cette clé manuellement : <code>{startState.secret}</code>
         </p>
-        <form action={confirmAction} className="flex flex-col gap-3">
-          <label htmlFor="confirm-code" className="block text-sm font-medium">
-            Code à 6 chiffres
-          </label>
-          <input
-            id="confirm-code"
-            name="code"
-            type="text"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            required
-            aria-invalid={Boolean(confirmState && "error" in confirmState)}
-            aria-describedby={confirmState && "error" in confirmState ? "confirm-error" : undefined}
-            className="w-full rounded-(--radius-md) border border-(--color-border) bg-(--color-surface) px-3 py-3 text-center text-lg tracking-widest"
-          />
-          <div role="alert" aria-live="assertive" className="min-h-6">
-            {confirmState && "error" in confirmState && (
-              <p id="confirm-error" className="text-sm text-(--color-danger)">
-                {confirmState.error}
-              </p>
-            )}
-          </div>
-          <button
-            type="submit"
-            disabled={confirmPending}
-            className="min-h-11 self-start rounded-(--radius-md) bg-(--color-primary) px-4 py-3 font-semibold text-(--color-primary-contrast) disabled:opacity-60"
-          >
-            {confirmPending ? "Vérification…" : "Activer la double authentification"}
-          </button>
-        </form>
+        <Form
+          action={confirmAction}
+          error={confirmState && "error" in confirmState ? confirmState.error : undefined}
+          actions={
+            <SubmitButton pendingLabel="Vérification…" className="self-start">
+              Activer la double authentification
+            </SubmitButton>
+          }
+        >
+          <Field name="code" label="Code à 6 chiffres">
+            <Input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              required
+              className="text-center text-lg tracking-widest"
+            />
+          </Field>
+        </Form>
       </div>
     );
   }
 
   // Étape 1 : point de départ.
   return (
-    <form action={startAction} className="flex flex-col gap-3">
+    <Form
+      action={startAction}
+      error={startState && "error" in startState ? startState.error : undefined}
+      actions={
+        <SubmitButton pendingLabel="Préparation…" className="self-start">
+          Activer la double authentification
+        </SubmitButton>
+      }
+    >
       <p className="text-(--color-text-muted)">
         La double authentification n&apos;est pas activée. Elle ajoute un code à 6 chiffres, en plus du
         mot de passe, à chaque connexion.
       </p>
-      {startState && "error" in startState && (
-        <p className="text-sm text-(--color-danger)">{startState.error}</p>
-      )}
-      <button
-        type="submit"
-        disabled={startPending}
-        className="min-h-11 self-start rounded-(--radius-md) bg-(--color-primary) px-4 py-3 font-semibold text-(--color-primary-contrast) disabled:opacity-60"
-      >
-        {startPending ? "Préparation…" : "Activer la double authentification"}
-      </button>
-    </form>
+    </Form>
   );
 }

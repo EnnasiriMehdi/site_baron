@@ -35,6 +35,8 @@ const pairs: Array<[string, string]> = [
   ["color-primary-contrast", "color-primary"],
   ["color-accent-contrast", "color-accent"],
   ["color-danger", "color-surface"],
+  ["color-success", "color-surface"],
+  ["color-warning", "color-surface"],
 ];
 
 // Icônes sur pastille teintée : éléments graphiques, pas du texte. Le minimum WCAG non-texte est 3:1.

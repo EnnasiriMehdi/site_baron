@@ -17,9 +17,12 @@ export function createContactService(
   onLeadCreated: (notice: NewLeadNotice) => void = () => {},
 ) {
   return {
-    async submit(input: ContactInput, files: File[]): Promise<number> {
+    // droppedBeforeStorage : fichiers écartés par l'appelant (plafond, quota). On y ajoute ceux dont l'écriture
+    // échoue (saveFiles ne renvoie que les réussis).
+    async submit(input: ContactInput, files: File[], droppedBeforeStorage = 0): Promise<number> {
       const attachments = files.length > 0 ? await saveFiles(files) : [];
-      const leadId = await repository.create(input, attachments);
+      const droppedAttachmentCount = droppedBeforeStorage + (files.length - attachments.length);
+      const leadId = await repository.create(input, attachments, droppedAttachmentCount);
 
       // La demande est déjà enregistrée : un échec de notification ne doit jamais faire échouer la soumission.
       try {

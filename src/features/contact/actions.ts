@@ -6,7 +6,7 @@ import { siteConfig } from "@/config/site";
 import { clientIp } from "@/lib/client-ip";
 import { RateLimiter } from "@/lib/rate-limit";
 import { GLOBAL_ATTACHMENT_SUBMISSIONS, GLOBAL_ATTACHMENT_WINDOW_MS } from "@/lib/upload-limits";
-import { storageHasRoomFor, validateAttachments } from "@/lib/uploads";
+import { selectFilesWithinQuota, validateAttachments } from "@/lib/uploads";
 
 import { contactService } from "./contact-instance";
 import { createFormToken, verifyFormToken } from "./form-token";
@@ -33,11 +33,21 @@ export async function issueFormTokenAction(): Promise<string> {
   return createFormToken();
 }
 
-function attachmentsUnavailable(): ContactFormState {
-  return {
-    ok: false,
-    error: `Les pièces jointes sont momentanément indisponibles. Renvoyez votre demande sans pièce jointe, ou appelez-nous au ${siteConfig.phone.display}.`,
-  };
+/*
+ * Fichiers à enregistrer, selon le plafond global puis le quota de stockage. Les fichiers écartés ne bloquent pas
+ * la demande : elle est enregistrée avec leur nombre, que l'admin voit. Le journal ne contient aucune donnée du visiteur.
+ */
+async function selectStorableFiles(files: File[]): Promise<File[]> {
+  if (files.length === 0) return [];
+  if (!globalAttachmentLimiter.hit("global").allowed) {
+    console.error("Pièces jointes non enregistrées : plafond d'envois avec fichiers atteint pour tout le site.");
+    return [];
+  }
+  const kept = await selectFilesWithinQuota(files);
+  if (kept.length < files.length) {
+    console.error("Pièces jointes non enregistrées : quota de stockage atteint.");
+  }
+  return kept;
 }
 
 export async function submitContactAction(_previous: ContactFormState, formData: FormData): Promise<ContactFormState> {
@@ -77,14 +87,10 @@ export async function submitContactAction(_previous: ContactFormState, formData:
     return { ok: false, error: attachmentCheck.error };
   }
 
-  if (files.length > 0) {
-    if (!globalAttachmentLimiter.hit("global").allowed) return attachmentsUnavailable();
-    const incomingBytes = files.reduce((sum, file) => sum + file.size, 0);
-    if (!(await storageHasRoomFor(incomingBytes))) return attachmentsUnavailable();
-  }
+  const storable = await selectStorableFiles(attachmentCheck.files);
 
   try {
-    await contactService.submit(parsed.data, attachmentCheck.files);
+    await contactService.submit(parsed.data, storable, attachmentCheck.files.length - storable.length);
   } catch (error) {
     // Sans ceci, une panne (base verrouillée, disque plein) affiche la page d'erreur par défaut de Next
     // et le visiteur ne sait pas si sa demande est partie. Nom de l'erreur seulement : aucune donnée

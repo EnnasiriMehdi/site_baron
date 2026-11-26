@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
 import { requireAdmin } from "@/features/admin-auth";
 import { siteConfig } from "@/config/site";
@@ -11,7 +10,8 @@ import { drizzleArticleRepository } from "./repository";
 import { articleSchema, isReadyToPublish } from "./schema";
 import { slugify } from "./slug";
 
-export type ArticleFormState = { error: string } | null;
+// Succès renvoyé au formulaire (qui affiche un toast puis navigue) : plus de redirect() côté serveur pour porter un message.
+export type ArticleFormState = { error: string } | { ok: true; id: number } | null;
 
 function revalidateArticlePaths(slug: string) {
   revalidatePath("/blog");
@@ -55,7 +55,7 @@ export async function createArticleAction(_previous: ArticleFormState, formData:
     return { error: "Ce slug est déjà utilisé par un autre article." };
   }
 
-  redirect(`/admin/articles/${id}/edit`);
+  return { ok: true, id };
 }
 
 export async function updateArticleAction(_previous: ArticleFormState, formData: FormData): Promise<ArticleFormState> {
@@ -98,7 +98,7 @@ export async function updateArticleAction(_previous: ArticleFormState, formData:
   }
 
   revalidateArticlePaths(parsed.data.slug);
-  return null;
+  return { ok: true, id: idValue };
 }
 
 // L'admin ne peut déclencher cette action que via le bouton "Publier" de la page d'édition, qui

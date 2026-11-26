@@ -1,12 +1,13 @@
 export { ChangePassword } from "./components/ChangePassword";
 export { ForgotPasswordForm } from "./components/ForgotPasswordForm";
 export { LoginForm } from "./components/LoginForm";
+export { LogoutButton } from "./components/LogoutButton";
 export { MfaEmailRecoveryForm } from "./components/MfaEmailRecoveryForm";
 export { MfaEmailRecoveryRequest } from "./components/MfaEmailRecoveryRequest";
 export { MfaForm } from "./components/MfaForm";
 export { TotpDisable } from "./components/TotpDisable";
 export { TotpEnrollment } from "./components/TotpEnrollment";
-export { loginAction, logoutAction } from "./actions";
+export { loginAction } from "./actions";
 export { verifyMfaAction } from "./mfa-actions";
 export {
   requireAdmin,

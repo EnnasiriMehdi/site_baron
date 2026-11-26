@@ -39,7 +39,40 @@ describe("createContactService.submit", () => {
     const service = createContactService(repository, vi.fn(async () => []));
 
     expect(await service.submit(input, [])).toBe(42);
-    expect(repository.create).toHaveBeenCalledWith(input, []);
+    expect(repository.create).toHaveBeenCalledWith(input, [], 0);
+  });
+
+  it("compte comme manquants les fichiers dont l'écriture a échoué, et garde les autres", async () => {
+    const repository = fakeRepository();
+    const onLeadCreated = vi.fn();
+    const service = createContactService(repository, vi.fn(async () => [stored]), onLeadCreated);
+    const files = [new File(["x"], "1.jpg"), new File(["x"], "2.jpg"), new File(["x"], "3.jpg")];
+
+    await service.submit(input, files);
+
+    expect(repository.create).toHaveBeenCalledWith(input, [stored], 2);
+    // La notification ne compte que ce qui est réellement enregistré.
+    expect(onLeadCreated).toHaveBeenCalledWith({ leadId: 42, attachmentCount: 1, attachmentBytes: 1200 });
+  });
+
+  it("ajoute les fichiers écartés avant écriture (plafond, quota) au compteur", async () => {
+    const repository = fakeRepository();
+    const service = createContactService(repository, vi.fn(async () => [stored]));
+
+    await service.submit(input, [new File(["x"], "1.jpg"), new File(["x"], "2.jpg")], 3);
+
+    expect(repository.create).toHaveBeenCalledWith(input, [stored], 4);
+  });
+
+  it("enregistre la demande quand tous les fichiers ont été écartés", async () => {
+    const repository = fakeRepository();
+    const saveFiles = vi.fn(async () => []);
+    const service = createContactService(repository, saveFiles);
+
+    await service.submit(input, [], 2);
+
+    expect(saveFiles).not.toHaveBeenCalled();
+    expect(repository.create).toHaveBeenCalledWith(input, [], 2);
   });
 
   it("n'écrit aucun fichier quand il n'y a pas de pièce jointe", async () => {
@@ -60,7 +93,7 @@ describe("createContactService.submit", () => {
     await service.submit(input, [file]);
 
     expect(saveFiles).toHaveBeenCalledWith([file]);
-    expect(repository.create).toHaveBeenCalledWith(input, [stored]);
+    expect(repository.create).toHaveBeenCalledWith(input, [stored], 0);
   });
 
   it("déclenche la notification avec l'identifiant et le nombre de pièces jointes, rien d'autre", async () => {

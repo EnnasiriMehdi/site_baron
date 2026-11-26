@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   ip: "203.0.113.1",
   submit: vi.fn(),
   verifyToken: vi.fn(),
-  hasRoom: vi.fn(),
+  withinQuota: vi.fn(),
 }));
 
 vi.mock("@/lib/client-ip", () => ({ clientIp: async () => mocks.ip }));
@@ -17,7 +17,7 @@ vi.mock("@/features/contact/form-token", () => ({
 // Le quota lit le disque : remplacé par un double. La validation des fichiers reste la vraie.
 vi.mock("@/lib/uploads", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/uploads")>()),
-  storageHasRoomFor: mocks.hasRoom,
+  selectFilesWithinQuota: mocks.withinQuota,
 }));
 
 import { submitContactAction } from "@/features/contact/actions";
@@ -47,8 +47,8 @@ beforeEach(() => {
   mocks.submit.mockResolvedValue(1);
   mocks.verifyToken.mockReset();
   mocks.verifyToken.mockResolvedValue(true);
-  mocks.hasRoom.mockReset();
-  mocks.hasRoom.mockResolvedValue(true);
+  mocks.withinQuota.mockReset();
+  mocks.withinQuota.mockImplementation(async (files: File[]) => files);
 });
 
 const JPEG_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
@@ -68,6 +68,7 @@ describe("submitContactAction", () => {
     expect(mocks.submit).toHaveBeenCalledWith(
       expect.objectContaining({ name: "Marie Dupont", email: "marie@exemple.fr" }),
       [],
+      0,
     );
   });
 
@@ -150,34 +151,52 @@ describe("submitContactAction", () => {
     expect(mocks.submit).not.toHaveBeenCalled();
   });
 
-  it("refuse les pièces jointes quand le quota de stockage est atteint, message toujours possible", async () => {
-    mocks.hasRoom.mockResolvedValue(false);
+  it("enregistre la demande sans les fichiers quand le quota est atteint, avec le compteur", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.withinQuota.mockResolvedValue([]);
 
-    const refused = await submitContactAction(null, formWithPhoto());
-    expect(refused?.ok).toBe(false);
-    if (refused && !refused.ok) expect(refused.error).toContain("sans pièce jointe");
-    expect(mocks.submit).not.toHaveBeenCalled();
+    const result = await submitContactAction(null, formWithPhoto());
 
-    // Le même message, sans fichier, passe : on ne perd jamais une demande à cause du quota.
-    expect(await submitContactAction(null, validForm())).toEqual({ ok: true });
-    expect(mocks.hasRoom).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ ok: true });
+    expect(mocks.submit).toHaveBeenCalledWith(expect.anything(), [], 1);
   });
 
-  it("plafonne les envois avec pièces jointes pour tout le site, même depuis des IP différentes", async () => {
-    let accepted = 0;
-    let refusedCount = 0;
+  it("garde les fichiers qui tiennent dans le quota et compte les autres", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.withinQuota.mockImplementation(async (files: File[]) => files.slice(0, 1));
+    const form = formWithPhoto();
+    form.append("attachments", new File([JPEG_BYTES], "marie-2.jpg", { type: "image/jpeg" }));
+
+    await submitContactAction(null, form);
+
+    expect(mocks.submit.mock.calls[0]?.[1]).toHaveLength(1);
+    expect(mocks.submit.mock.calls[0]?.[2]).toBe(1);
+    // Aucune donnée du visiteur dans le journal.
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain("marie");
+  });
+
+  it("n'interroge pas le quota quand il n'y a pas de fichier", async () => {
+    await submitContactAction(null, validForm());
+
+    expect(mocks.withinQuota).not.toHaveBeenCalled();
+    expect(mocks.submit).toHaveBeenCalledWith(expect.anything(), [], 0);
+  });
+
+  it("plafonne les fichiers stockés pour tout le site sans refuser les demandes", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
     for (let i = 0; i < 40; i += 1) {
       mocks.ip = `192.0.2.${i + 1}`;
-      const result = await submitContactAction(null, formWithPhoto());
-      if (result?.ok) accepted += 1;
-      else refusedCount += 1;
+      expect(await submitContactAction(null, formWithPhoto())).toEqual({ ok: true });
     }
 
-    expect(accepted).toBeLessThanOrEqual(30);
-    expect(refusedCount).toBeGreaterThanOrEqual(10);
-    // Sans fichier, le formulaire reste utilisable même quand le plafond global est atteint.
-    mocks.ip = "192.0.2.250";
-    expect(await submitContactAction(null, validForm())).toEqual({ ok: true });
+    expect(mocks.submit).toHaveBeenCalledTimes(40);
+    const withFiles = mocks.submit.mock.calls.filter((call) => call[1].length === 1);
+    const dropped = mocks.submit.mock.calls.filter((call) => call[2] === 1);
+    // Plafond partagé avec les tests précédents : au plus 30 envois avec fichiers, le reste est compté manquant.
+    expect(withFiles.length).toBeLessThanOrEqual(30);
+    expect(dropped.length).toBeGreaterThanOrEqual(10);
+    expect(withFiles.length + dropped.length).toBe(40);
   });
 
   it("répond par un message clair avec le téléphone si l'enregistrement échoue", async () => {
