@@ -15,6 +15,8 @@ export type ArticleFormState = { error: string } | { ok: true; id: number } | nu
 
 function revalidateArticlePaths(slug: string) {
   revalidatePath("/blog");
+  // Une publication ou un retrait décale les articles sur toutes les pages de liste.
+  revalidatePath("/blog/page/[page]", "page");
   revalidatePath(`/blog/${slug}`);
   revalidatePath("/sitemap.xml");
   revalidatePath("/admin/articles");
@@ -84,21 +86,26 @@ export async function updateArticleAction(_previous: ArticleFormState, formData:
     return { error: "Ce slug est déjà utilisé par un autre article." };
   }
 
-  const photo = formData.get("coverImage");
-  const photoAlt = formData.get("coverImageAlt");
-  if (photo instanceof File && photo.size > 0) {
-    if (typeof photoAlt !== "string" || photoAlt.trim().length === 0) {
-      return { error: "Texte alternatif requis pour la photo de couverture." };
+  // Le texte est désormais en base : les pages publiques doivent être rafraîchies même si la photo de couverture
+  // échoue ensuite, d'où le `finally` (couvre chaque sortie, y compris une erreur d'écriture).
+  try {
+    const photo = formData.get("coverImage");
+    const photoAlt = formData.get("coverImageAlt");
+    if (photo instanceof File && photo.size > 0) {
+      if (typeof photoAlt !== "string" || photoAlt.trim().length === 0) {
+        return { error: "Texte alternatif requis pour la photo de couverture." };
+      }
+      const imageCheck = await validatePublicImage(photo);
+      if (!imageCheck.ok) return { error: imageCheck.error };
+
+      const path = await storePublicImage(imageCheck.file, "articles");
+      await drizzleArticleRepository.setCoverImage(idValue, path, photoAlt.trim());
     }
-    const imageCheck = await validatePublicImage(photo);
-    if (!imageCheck.ok) return { error: imageCheck.error };
 
-    const path = await storePublicImage(imageCheck.file, "articles");
-    await drizzleArticleRepository.setCoverImage(idValue, path, photoAlt.trim());
+    return { ok: true, id: idValue };
+  } finally {
+    revalidateArticlePaths(parsed.data.slug);
   }
-
-  revalidateArticlePaths(parsed.data.slug);
-  return { ok: true, id: idValue };
 }
 
 // L'admin ne peut déclencher cette action que via le bouton "Publier" de la page d'édition, qui
