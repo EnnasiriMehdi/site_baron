@@ -18,13 +18,17 @@ import {
   UndoRedo,
 } from "@mdxeditor/editor";
 
+import { compressImage, PUBLIC_IMAGE_MAX_SIDE } from "@/lib/image-compression";
+
 import { uploadArticleImageAction } from "../actions";
 
 // Envoie le fichier à la Server Action (même allowlist que la couverture d'article : JPG/PNG/WEBP,
 // 5 Mo, cf. uploadArticleImageAction) et laisse MDXEditor insérer `![alt](url)` à l'endroit du
 // curseur — toujours du Markdown en base, jamais du HTML stocké (CLAUDE.md, 7ter.2).
+// La photo est d'abord allégée dans le navigateur : les images du corps d'un article sont servies telles quelles.
 async function imageUploadHandler(image: File): Promise<string> {
-  const result = await uploadArticleImageAction(image);
+  const optimized = await compressImage(image, { maxSide: PUBLIC_IMAGE_MAX_SIDE, alwaysReencode: true });
+  const result = await uploadArticleImageAction(optimized);
   if (!result.ok) throw new Error(result.error);
   return result.url;
 }

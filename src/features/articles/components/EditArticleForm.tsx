@@ -6,6 +6,7 @@ import { siteConfig } from "@/config/site";
 import { FileInput, Field, Form, Input, Select, SubmitButton, Textarea } from "@/components/ui/form";
 import { useToast } from "@/components/ui/toast/toast";
 import type { Article } from "@/lib/db/schema";
+import { PUBLIC_IMAGE_MAX_SIDE } from "@/lib/image-compression";
 
 import { updateArticleAction, type ArticleFormState } from "../actions";
 import { ArticleEditor } from "./ArticleEditor";
@@ -80,7 +81,7 @@ export function EditArticleForm({ article }: EditArticleFormProps) {
           article.coverImagePath ? " — remplace la photo actuelle si vous en choisissez une nouvelle" : ""
         }`}
       >
-        <FileInput accept="image/jpeg,image/png,image/webp" />
+        <FileInput accept="image/jpeg,image/png,image/webp" optimizeImages={PUBLIC_IMAGE_MAX_SIDE} />
       </Field>
 
       <Field

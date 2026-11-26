@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { COMPRESSION_MAX_SIDE, computeTargetSize } from "@/features/contact/image-compression";
+import { COMPRESSION_MAX_SIDE, computeTargetSize } from "@/lib/image-compression";
 
 /*
  * Seul le calcul des dimensions est testable ici (pas de navigateur). La compression elle-même, qui
