@@ -1,7 +1,7 @@
 import { siteConfig } from "@/config/site";
 
 import { escapeHtml } from "./escape-html";
-import type { RenderedEmail } from "./contact-confirmation";
+import type { RenderedEmail } from "./rendered-email";
 
 export type AdminSecurityAlertInput = {
   kind: "password_reset" | "mfa_reset" | "mfa_locked" | "login_locked";
