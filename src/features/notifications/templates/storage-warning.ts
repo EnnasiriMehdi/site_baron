@@ -1,7 +1,7 @@
 import { siteConfig } from "@/config/site";
 
 import { adminUrl, renderAdminNotice } from "./admin-notice";
-import type { RenderedEmail } from "./contact-confirmation";
+import type { RenderedEmail } from "./rendered-email";
 
 export type StorageWarningInput = {
   // Calculé par le serveur à partir de la taille des fichiers : un entier, jamais une valeur du visiteur.

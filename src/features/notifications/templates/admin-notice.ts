@@ -1,7 +1,7 @@
 import { siteConfig } from "@/config/site";
 
 import { escapeHtml } from "./escape-html";
-import type { RenderedEmail } from "./contact-confirmation";
+import type { RenderedEmail } from "./rendered-email";
 
 // Lien vers l'administration : base = config du site, chemin fixé par le code (jamais une valeur du visiteur).
 export function adminUrl(path: string): string {
