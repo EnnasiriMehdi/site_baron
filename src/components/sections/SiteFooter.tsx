@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { siteConfig } from "@/config/site";
 
 export function SiteFooter() {
@@ -22,7 +24,14 @@ export function SiteFooter() {
         <p>
           {siteConfig.address.street}, {siteConfig.address.postalCode} {siteConfig.address.city}
         </p>
-        <p>Mentions légales · Politique de confidentialité</p>
+        <nav aria-label="Informations légales" className="flex flex-wrap gap-x-4">
+          <Link href="/mentions-legales" className="inline-flex min-h-11 items-center underline">
+            Mentions légales
+          </Link>
+          <Link href="/politique-de-confidentialite" className="inline-flex min-h-11 items-center underline">
+            Politique de confidentialité
+          </Link>
+        </nav>
       </div>
     </footer>
   );

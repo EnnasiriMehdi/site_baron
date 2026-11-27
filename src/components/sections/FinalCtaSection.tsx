@@ -1,5 +1,8 @@
+import Link from "next/link";
+
 import { ContactForm } from "@/features/contact";
 import { siteConfig } from "@/config/site";
+import { contactPrivacyNotice } from "@/content/legal";
 import { IconPhone } from "@/components/ui/icons";
 
 export function FinalCtaSection() {
@@ -45,6 +48,12 @@ export function FinalCtaSection() {
           <div className="mt-6">
             <ContactForm />
           </div>
+          <p className="mt-4 text-sm break-words text-(--color-text-muted)">
+            {contactPrivacyNotice}{" "}
+            <Link href="/politique-de-confidentialite" className="underline">
+              Voir la politique de confidentialité
+            </Link>
+          </p>
         </div>
       </div>
     </section>

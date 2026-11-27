@@ -5,10 +5,10 @@
 export const siteConfig = {
   name: "Nova Chauffage",
   // Raison sociale (peut différer du nom commercial ci-dessus) et numéro SIRET : exigés en mentions
-  // légales et utiles aux données structurées (CLAUDE.md, 7bis.2 et 5.2). Toutes les valeurs TODO(contenu)
-  // de ce fichier sont listées et expliquées dans TODO-CONTENU.md, à la racine du projet.
-  legalName: "TODO(contenu) : raison sociale",
-  siret: "TODO(contenu) : numéro SIRET",
+  // légales et utiles aux données structurées (CLAUDE.md, 7bis.2 et 5.2). Toutes les valeurs manquantes
+  // ([<…>] ou TODO(contenu)) sont listées et expliquées dans TODO-CONTENU.md, à la racine du projet.
+  legalName: "[<raison sociale, ou nom et prénom suivis de « EI »>]",
+  siret: "[<numéro SIRET>]",
   tagline: "Chauffage, climatisation et plomberie — pour particuliers et professionnels.",
   description:
     "Dépannage chauffage, climatisation et plomberie, pour particuliers et professionnels : un technicien vous rappelle vite, avec un prix annoncé avant toute intervention.",
@@ -24,10 +24,39 @@ export const siteConfig = {
   contactName: "Baron Behnam",
   // Adresse postale : la ville vient de la fiche Google (confirmée), le reste est à fournir.
   address: {
-    street: "TODO(contenu) : numéro et nom de rue",
-    postalCode: "TODO(contenu) : code postal",
+    street: "[<numéro et nom de rue>]",
+    postalCode: "[<code postal>]",
     city: "Montauroux",
     country: "FR",
+  },
+  // Informations des pages légales (content/legal.ts). Les [<…>] sont à fournir par le client.
+  legal: {
+    form: "[<forme juridique : EI, SARL, SAS…>]",
+    capital: "[<capital social, si société>]",
+    rne: "[<numéro d'immatriculation au RNE>]",
+    rcs: "[<numéro RCS et ville du greffe, le cas échéant>]",
+    vatNumber: "[<numéro de TVA intracommunautaire, le cas échéant>]",
+    publicationDirector: "[<nom du directeur de la publication>]",
+    insurance: "[<assureur, adresse, numéro de contrat et zone couverte>]",
+    host: {
+      name: "[<nom de l'hébergeur>]",
+      address: "[<adresse de l'hébergeur>]",
+      phone: "[<téléphone de l'hébergeur>]",
+      country: "[<pays d'hébergement>]",
+    },
+    mediator: {
+      name: "[<nom du médiateur de la consommation>]",
+      address: "[<adresse du médiateur>]",
+      website: "[<site internet du médiateur>]",
+    },
+    maintenanceProvider: "[<prestataire de maintenance du site, le cas échéant>]",
+    // Fournisseur de la boîte e-mail de l'entreprise (adresse `email` ci-dessus).
+    emailProvider: "Google (Gmail)",
+    emailTransfer: "[<transferts hors Union européenne liés à la messagerie et garanties appliquées>]",
+    leadRetention: "[<durée de conservation des demandes>]",
+    backupRetention: "[<durée de conservation des sauvegardes>]",
+    serverLogs: "[<journaux du serveur : données enregistrées et durée de conservation>]",
+    updatedAt: "[<date de mise à jour>]",
   },
   // Lien stable vers la fiche Google (vérifié en le rouvrant) : utilisé pour "voir tous les avis".
   googleReviewsUrl:
