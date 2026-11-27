@@ -23,5 +23,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: article.updatedAt,
     })),
     ...(realisationsCount > 0 ? [{ url: `${siteConfig.url}/realisations` }] : []),
+    { url: `${siteConfig.url}/mentions-legales` },
+    { url: `${siteConfig.url}/politique-de-confidentialite` },
   ];
 }
